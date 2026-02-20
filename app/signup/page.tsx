@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Mail, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
 
-const RATE_LIMIT_KEY = 'magic_link_requests';
+const RATE_LIMIT_KEY = 'magic_link_requests_signup';
 const MAX_REQUESTS = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
@@ -134,7 +134,7 @@ export default function SignupPage() {
             TinyFeedback
           </h1>
           <p style={{ color: '#888888' }}>
-            Crie sua conta com email
+            Crie sua conta
           </p>
         </div>
 
@@ -266,7 +266,7 @@ export default function SignupPage() {
                 </>
               ) : (
                 <>
-                  Continuar com Email
+                  Criar conta
                   <ArrowRight size={18} />
                 </>
               )}
@@ -278,6 +278,21 @@ export default function SignupPage() {
               style={{ color: '#666666' }}
             >
               Não precisa de senha. Usamos links mágicos seguros.
+            </p>
+
+            {/* Login Link */}
+            <p 
+              className="text-center text-sm"
+              style={{ color: '#666666' }}
+            >
+              Já tem uma conta?{' '}
+              <a 
+                href="/login" 
+                style={{ color: '#00ff88' }}
+                className="hover:underline"
+              >
+                Entrar
+              </a>
             </p>
 
             {/* Rate Limit Info */}
