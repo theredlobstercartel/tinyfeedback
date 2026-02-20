@@ -42,6 +42,7 @@ export interface Project {
   id: string;
   name: string;
   slug: string;
+  description?: string;
   api_key: string;
   user_id: string;
   widget_color: string;

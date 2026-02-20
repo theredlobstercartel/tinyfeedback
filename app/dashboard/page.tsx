@@ -174,8 +174,9 @@ export default function DashboardPage() {
             Ações Rápidas
           </h3>
           <div className="flex flex-wrap gap-4">
-            <button
-              className="px-6 py-3 font-medium transition-colors"
+            <a
+              href="/projects/new"
+              className="px-6 py-3 font-medium transition-colors inline-flex items-center"
               style={{
                 backgroundColor: '#00ff88',
                 color: '#000000',
@@ -188,7 +189,7 @@ export default function DashboardPage() {
               }}
             >
               Criar Projeto
-            </button>
+            </a>
             <button
               className="px-6 py-3 font-medium transition-colors"
               style={{
