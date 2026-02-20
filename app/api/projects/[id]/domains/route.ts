@@ -68,7 +68,7 @@ export async function PATCH(
       updatedDomains = [...currentDomains, normalizedDomain];
     } else {
       // Remove domain
-      updatedDomains = currentDomains.filter(d => d !== normalizedDomain);
+      updatedDomains = currentDomains.filter((d: string) => d !== normalizedDomain);
     }
 
     // Update project
