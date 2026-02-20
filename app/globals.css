@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  /* Cyber-neon color palette */
+  --background: #000000;
+  --surface: #0a0a0a;
+  --foreground: #ffffff;
+  --foreground-secondary: #888888;
+  --accent-primary: #00ff88;
+  --accent-secondary: #00d4ff;
+  --border-default: #222222;
+  --border-accent: #00ff88;
+  --error: #ff4444;
+  --warning: #ffaa00;
+  --success: #00ff88;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-border-default: var(--border-default);
+  --color-border-accent: var(--border-accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-radius: 0 !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Geist Sans', Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar for cyber-neon theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border: 1px solid var(--border-default);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Selection styling */
+::selection {
+  background: var(--accent-primary);
+  color: var(--background);
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Neon glow effect utility */
+.neon-glow {
+  box-shadow: 0 0 5px var(--accent-primary),
+              0 0 10px var(--accent-primary),
+              0 0 20px var(--accent-primary);
+}
+
+.neon-text {
+  text-shadow: 0 0 5px var(--accent-primary),
+               0 0 10px var(--accent-primary);
+}
