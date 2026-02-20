@@ -108,7 +108,7 @@ export default function NewProjectPage() {
                     type="text"
                     value={createdProject.api_key}
                     readOnly
-                    className="flex-1 px-4 py-3 text-sm font-mono"
+                    className="flex-1 px-4 py-3 text-sm font-mono focus:outline-none"
                     style={{
                       backgroundColor: '#000000',
                       border: '1px solid #222222',

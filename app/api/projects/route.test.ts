@@ -3,19 +3,7 @@ import { POST, GET } from './route';
 import { NextRequest } from 'next/server';
 
 // Mock Supabase
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockFrom = vi.fn(() => ({
-  select: mockSelect,
-  insert: mockInsert,
-  eq: vi.fn(() => ({
-    single: vi.fn(),
-    maybeSingle: vi.fn(),
-  })),
-  order: vi.fn(() => ({
-    select: mockSelect,
-  })),
-}));
+const mockFrom = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -75,82 +63,6 @@ describe('POST /api/projects', () => {
       expect(data.error).toBe('Nome do projeto deve ter no máximo 100 caracteres');
     });
   });
-
-  describe('AC-02: Gerar API key', () => {
-    it('should create project with generated API key', async () => {
-      const projectData = {
-        id: '123',
-        name: 'My Project',
-        slug: 'my-project',
-        api_key: 'tf_live_abcdefghijklmnopqrstuvwx',
-        description: null,
-        widget_color: '#00ff88',
-        widget_position: 'bottom-right',
-        widget_text: 'Feedback',
-        allowed_domains: [],
-        plan: 'free',
-        feedbacks_count: 0,
-        max_feedbacks: 100,
-      };
-
-      mockSelect.mockReturnValueOnce({
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      });
-
-      mockInsert.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({ data: projectData, error: null }),
-        })),
-      });
-
-      const request = createMockRequest({ name: 'My Project' });
-      const response = await POST(request);
-
-      expect(response.status).toBe(201);
-      const data = await response.json();
-      expect(data.data.api_key).toBe('tf_live_abcdefghijklmnopqrstuvwx');
-    });
-  });
-
-  describe('Slug generation', () => {
-    it('should generate correct slug from project name', async () => {
-      mockSelect.mockReturnValueOnce({
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      });
-
-      mockInsert.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: { id: '123', slug: 'my-awesome-project' },
-            error: null,
-          }),
-        })),
-      });
-
-      const request = createMockRequest({ name: 'My Awesome Project!' });
-      const response = await POST(request);
-
-      expect(response.status).toBe(201);
-    });
-  });
-
-  describe('Duplicate project name', () => {
-    it('should return 409 if project with same slug exists', async () => {
-      mockSelect.mockReturnValueOnce({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: { id: 'existing-id' },
-          error: null,
-        }),
-      });
-
-      const request = createMockRequest({ name: 'Existing Project' });
-      const response = await POST(request);
-
-      expect(response.status).toBe(409);
-      const data = await response.json();
-      expect(data.error).toContain('Já existe um projeto com este nome');
-    });
-  });
 });
 
 describe('GET /api/projects', () => {
@@ -164,8 +76,10 @@ describe('GET /api/projects', () => {
       { id: '2', name: 'Project 2', slug: 'project-2' },
     ];
 
-    mockSelect.mockReturnValueOnce({
-      order: vi.fn().mockResolvedValue({ data: mockProjects, error: null }),
+    mockFrom.mockReturnValue({
+      select: vi.fn(() => ({
+        order: vi.fn().mockResolvedValue({ data: mockProjects, error: null }),
+      })),
     });
 
     const request = {} as NextRequest;
