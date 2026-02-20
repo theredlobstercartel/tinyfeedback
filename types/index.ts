@@ -37,3 +37,25 @@ export interface UpdateFeedbackInput {
   response_sent?: boolean;
   response_content?: string;
 }
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  api_key: string;
+  user_id: string;
+  widget_color: string;
+  widget_position: string;
+  widget_text: string;
+  allowed_domains: string[];
+  plan: string;
+  feedbacks_count: number;
+  max_feedbacks: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateProjectDomainsInput {
+  action: 'add' | 'remove';
+  domain: string;
+}
