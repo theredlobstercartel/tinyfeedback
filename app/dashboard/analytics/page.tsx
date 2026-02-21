@@ -15,7 +15,16 @@ import {
   Calendar
 } from 'lucide-react';
 import type { Project } from '@/types';
-import { StatCard, NpsGauge, TrendChart, VolumeChart } from '@/components/analytics';
+import { StatCard, NpsGauge, TrendChart, VolumeChart, NpsOverTimeChart } from '@/components/analytics';
+
+interface NpsOverTimeDataPoint {
+  date: string;
+  npsScore: number | null;
+  promoters: number;
+  passives: number;
+  detractors: number;
+  totalResponses: number;
+}
 
 interface AnalyticsData {
   totalFeedbacks: number;
@@ -45,6 +54,11 @@ export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // NPS Over Time state
+  const [npsOverTimeData, setNpsOverTimeData] = useState<NpsOverTimeDataPoint[]>([]);
+  const [npsPeriod, setNpsPeriod] = useState<number>(30);
+  const [isNpsLoading, setIsNpsLoading] = useState(false);
 
   // Load user and project
   useEffect(() => {
@@ -101,6 +115,37 @@ export default function AnalyticsPage() {
       loadAnalytics();
     }
   }, [project?.id, loadAnalytics]);
+
+  // Load NPS over time data
+  const loadNpsOverTime = useCallback(async () => {
+    if (!project?.id) return;
+
+    setIsNpsLoading(true);
+
+    try {
+      const response = await fetch(`/api/analytics/nps-over-time?project_id=${project.id}&days=${npsPeriod}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch NPS data');
+      }
+
+      const data = await response.json();
+      setNpsOverTimeData(data.data);
+    } catch (err) {
+      console.error('Error loading NPS over time:', err);
+      // Don't set error state - NPS chart can fail independently
+    } finally {
+      setIsNpsLoading(false);
+    }
+  }, [project?.id, npsPeriod]);
+
+  // Load NPS over time when project or period changes
+  useEffect(() => {
+    if (project?.id) {
+      loadNpsOverTime();
+    }
+  }, [project?.id, npsPeriod, loadNpsOverTime]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -265,6 +310,14 @@ export default function AnalyticsPage() {
 
             {/* Volume Chart - Full Width */}
             <VolumeChart data={analytics.volumeData} />
+
+            {/* NPS Over Time Chart - Full Width */}
+            <NpsOverTimeChart
+              data={npsOverTimeData}
+              period={npsPeriod}
+              onPeriodChange={setNpsPeriod}
+              isLoading={isNpsLoading}
+            />
 
             {/* Additional Metrics */}
             <div 
