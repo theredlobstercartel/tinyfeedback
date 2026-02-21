@@ -23,7 +23,7 @@ export default function DashboardPage() {
       
       if (user) {
         const { data: projects } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
@@ -53,7 +53,7 @@ export default function DashboardPage() {
     
     if (user) {
       const { data: projects } = await supabase
-        .from('projects')
+        .from('bmad_projects')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });

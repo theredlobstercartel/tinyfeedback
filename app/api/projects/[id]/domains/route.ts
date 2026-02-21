@@ -37,7 +37,7 @@ export async function PATCH(
 
     // Fetch current project data
     const { data: project, error: fetchError } = await supabase
-      .from('projects')
+      .from('bmad_projects')
       .select('allowed_domains')
       .eq('id', id)
       .single();
@@ -73,7 +73,7 @@ export async function PATCH(
 
     // Update project
     const { data, error: updateError } = await supabase
-      .from('projects')
+      .from('bmad_projects')
       .update({
         allowed_domains: updatedDomains,
         updated_at: new Date().toISOString(),
@@ -109,7 +109,7 @@ export async function GET(
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data, error } = await supabase
-      .from('projects')
+      .from('bmad_projects')
       .select('id, name, allowed_domains')
       .eq('id', id)
       .single();

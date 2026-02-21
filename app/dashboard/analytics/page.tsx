@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
       setUser(user);
       
       const { data: project } = await supabase
-        .from('projects')
+        .from('bmad_projects')
         .select('*')
         .eq('user_id', user.id)
         .single();

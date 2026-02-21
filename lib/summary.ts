@@ -43,7 +43,7 @@ export async function generateDailySummary(
 
   // Get project info
   const { data: project, error: projectError } = await supabase
-    .from('projects')
+    .from('bmad_projects')
     .select('id, name')
     .eq('id', projectId)
     .single();
@@ -140,7 +140,7 @@ export async function generateWeeklySummary(
 
   // Get project info
   const { data: project, error: projectError } = await supabase
-    .from('projects')
+    .from('bmad_projects')
     .select('id, name')
     .eq('id', projectId)
     .single();
