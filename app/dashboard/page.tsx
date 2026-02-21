@@ -305,26 +305,6 @@ export default function DashboardPage() {
             >
               Configurações
             </a>
-            {!isPro && (
-              <a
-                href="/upgrade"
-                className="px-6 py-3 font-medium transition-colors inline-flex items-center gap-2"
-                style={{
-                  backgroundColor: 'transparent',
-                  color: '#ffd700',
-                  border: '1px solid #ffd700',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 215, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <Sparkles size={18} />
-                Upgrade Pro
-              </a>
-            )}
           </div>
         </section>
 
