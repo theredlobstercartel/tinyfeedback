@@ -4,6 +4,7 @@
  */
 
 import { NPSModal, NPSModalOptions } from './modals/NPSModal.js';
+import { SuggestionModal, SuggestionModalOptions } from './modals/SuggestionModal.js';
 
 interface WidgetConfig {
   projectId: string;
@@ -14,6 +15,7 @@ interface WidgetConfig {
 class TinyFeedbackWidget {
   private config: Required<WidgetConfig>;
   private npsModal: NPSModal | null = null;
+  private suggestionModal: SuggestionModal | null = null;
 
   constructor(config: WidgetConfig) {
     this.config = {
@@ -48,11 +50,34 @@ class TinyFeedbackWidget {
   }
 
   /**
+   * Open the Suggestion modal
+   * ST-07: Implementar Modal de Sugestão
+   */
+  public openSuggestion(): void {
+    if (this.suggestionModal) {
+      this.suggestionModal.close();
+    }
+    
+    this.suggestionModal = new SuggestionModal({
+      projectId: this.config.projectId,
+      apiKey: this.config.apiKey,
+      apiUrl: this.config.apiUrl,
+      onClose: () => {
+        this.suggestionModal = null;
+      }
+    });
+    
+    this.suggestionModal.open();
+  }
+
+  /**
    * Close any open modals
    */
   public close(): void {
     this.npsModal?.close();
     this.npsModal = null;
+    this.suggestionModal?.close();
+    this.suggestionModal = null;
   }
 
   /**
@@ -73,8 +98,8 @@ class TinyFeedbackWidget {
 }
 
 // Export for UMD build
-export { TinyFeedbackWidget, NPSModal };
-export type { NPSModalOptions };
+export { TinyFeedbackWidget, NPSModal, SuggestionModal };
+export type { NPSModalOptions, SuggestionModalOptions };
 export type { WidgetConfig };
 
 // Global window interface
@@ -96,6 +121,11 @@ if (typeof window !== 'undefined') {
     // Auto-open NPS if triggered
     if ((window as unknown as Record<string, unknown>).__TF_OPEN_NPS__) {
       widget.openNPS();
+    }
+    
+    // Auto-open Suggestion if triggered
+    if ((window as unknown as Record<string, unknown>).__TF_OPEN_SUGGESTION__) {
+      widget.openSuggestion();
     }
   }
 }
