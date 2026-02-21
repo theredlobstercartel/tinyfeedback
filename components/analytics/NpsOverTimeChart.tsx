@@ -210,9 +210,10 @@ export function NpsOverTimeChart({ data, period, onPeriodChange, isLoading }: Np
                 color: '#ffffff',
                 fontSize: '0.875rem',
               }}
-              formatter={(value: number | null) => {
-                return value !== null 
-                  ? [`NPS: ${value.toFixed(1)}`, '']
+              formatter={(value) => {
+                const numValue = value as number | null | undefined;
+                return numValue !== null && numValue !== undefined
+                  ? [`NPS: ${numValue.toFixed(1)}`, '']
                   : ['Sem dados', ''];
               }}
               labelFormatter={(label, payload) => {
