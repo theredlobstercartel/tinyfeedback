@@ -1,4 +1,4 @@
-import { DomainManager, NotificationPreferencesManager, SummarySettingsManager, WidgetAppearanceSettings } from '@/components/settings';
+import { DomainManager, NotificationPreferencesManager, NotificationSettings, SummarySettingsManager, WidgetAppearanceSettings } from '@/components/settings';
 
 // Demo project ID for testing
 const DEMO_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -22,6 +22,11 @@ export default function SettingsPage() {
 
         {/* Widget Appearance - ST-18 */}
         <WidgetAppearanceSettings 
+          projectId={DEMO_PROJECT_ID}
+        />
+
+        {/* Notification Settings - ST-25 */}
+        <NotificationSettings 
           projectId={DEMO_PROJECT_ID}
         />
 
@@ -56,6 +61,10 @@ export default function SettingsPage() {
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Color picker com presets e input HEX</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-02: Selector de posição (4 opções)</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-03: Texto customizável do botão</li>
+            <li style={{ color: '#00ff88' }}>✅ ST-25: Configurar Notificações por Email - Implementado</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Toggles para Instantâneo, Diário, Semanal</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- AC-02: Campo para email de destino</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- Coluna instant_notifications_enabled adicionada</li>
             <li style={{ color: '#00ff88' }}>✅ ST-27: Resumo Diário/Semanal - Implementado</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Cron job para envio automático</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-02: Conteúdo com total, média NPS e highlights</li>

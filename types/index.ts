@@ -77,6 +77,8 @@ export interface NotificationPreferences {
   notify_nps: boolean;
   notify_suggestion: boolean;
   notify_bug: boolean;
+  // ST-25: Instant notification preference
+  instant_notifications_enabled: boolean;
   // ST-27: Summary preferences
   daily_summary_enabled: boolean;
   weekly_summary_enabled: boolean;
@@ -91,6 +93,8 @@ export interface UpdateNotificationPreferencesInput {
   notify_nps?: boolean;
   notify_suggestion?: boolean;
   notify_bug?: boolean;
+  // ST-25: Instant notification preference
+  instant_notifications_enabled?: boolean;
   // ST-27: Summary preferences
   daily_summary_enabled?: boolean;
   weekly_summary_enabled?: boolean;

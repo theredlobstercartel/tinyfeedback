@@ -36,6 +36,7 @@ export async function GET(
           notify_nps: true,
           notify_suggestion: true,
           notify_bug: true,
+          instant_notifications_enabled: true,
           daily_summary_enabled: false,
           weekly_summary_enabled: false,
           summary_email: null,
@@ -65,7 +66,7 @@ export async function PATCH(
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Validate input - at least one field should be provided
-    const validFields = ['notify_nps', 'notify_suggestion', 'notify_bug', 'daily_summary_enabled', 'weekly_summary_enabled', 'summary_email'];
+    const validFields = ['notify_nps', 'notify_suggestion', 'notify_bug', 'instant_notifications_enabled', 'daily_summary_enabled', 'weekly_summary_enabled', 'summary_email'];
     const hasValidField = validFields.some(field => field in body);
     
     if (!hasValidField) {
@@ -122,6 +123,7 @@ export async function PATCH(
           notify_nps: body.notify_nps ?? true,
           notify_suggestion: body.notify_suggestion ?? true,
           notify_bug: body.notify_bug ?? true,
+          instant_notifications_enabled: body.instant_notifications_enabled ?? true,
           daily_summary_enabled: body.daily_summary_enabled ?? false,
           weekly_summary_enabled: body.weekly_summary_enabled ?? false,
           summary_email: body.summary_email ?? null,
