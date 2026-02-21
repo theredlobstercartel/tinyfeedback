@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { 
+  getClientIP, 
+  checkRateLimit, 
+  getRateLimitHeaders, 
+  getRateLimitErrorMessage 
+} from '@/lib/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -24,6 +30,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         status: 204,
         headers: corsHeaders 
       });
+    }
+
+    // Check rate limit
+    const clientIP = getClientIP(request);
+    const rateLimitResult = checkRateLimit(clientIP);
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: getRateLimitErrorMessage(rateLimitResult.retryAfter || 60) },
+        { 
+          status: 429, 
+          headers: { ...corsHeaders, ...rateLimitHeaders }
+        }
+      );
     }
 
     // Get API key from header
@@ -167,7 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(
       { success: true, data: feedback },
-      { status: 201, headers: corsHeaders }
+      { status: 201, headers: { ...corsHeaders, ...rateLimitHeaders } }
     );
 
   } catch (error) {
