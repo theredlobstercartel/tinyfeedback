@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Check, Loader2 } from 'lucide-react';
 
-export default function BillingSuccessPage() {
+function BillingSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -80,5 +80,18 @@ export default function BillingSuccessPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function BillingSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <Loader2 className="w-12 h-12 animate-spin text-zinc-900 mb-4" />
+        <h1 className="text-xl font-semibold text-zinc-900">Carregando...</h1>
+      </div>
+    }>
+      <BillingSuccessContent />
+    </Suspense>
   );
 }

@@ -16,8 +16,19 @@ import {
 } from './summary-template';
 import { DailySummaryData } from '@/lib/summary';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend client
+let resendInstance: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resendInstance) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing RESEND_API_KEY environment variable');
+    }
+    resendInstance = new Resend(apiKey);
+  }
+  return resendInstance;
+}
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -38,6 +49,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{
   const { to, subject, html, text, from = 'TinyFeedback <onotificacoes@tinyfeedback.app>' } = options;
 
   try {
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from,
       to,

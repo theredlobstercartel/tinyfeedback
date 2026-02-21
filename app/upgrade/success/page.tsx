@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Check, Loader2, Sparkles } from 'lucide-react';
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   
@@ -159,5 +159,18 @@ export default function SuccessPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ backgroundColor: '#000000' }}>
+        <Loader2 size={48} className="animate-spin" style={{ color: '#00ff88' }} />
+        <p style={{ color: '#888888' }}>Carregando...</p>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   );
 }
