@@ -59,3 +59,6 @@ export interface UpdateProjectDomainsInput {
   action: 'add' | 'remove';
   domain: string;
 }
+
+// Re-export Stripe types
+export * from './stripe';
