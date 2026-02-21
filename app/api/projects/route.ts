@@ -106,7 +106,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         widget_color: '#00ff88',
         widget_position: 'bottom-right',
         widget_text: 'Feedback',
-        allowed_domains: [],
         plan: 'free',
         feedbacks_count: 0,
         max_feedbacks: 50,
