@@ -17,6 +17,7 @@ import {
 import type { Project, Feedback } from '@/types';
 import { FeedbackCard } from '@/components/feedback/FeedbackCard';
 import { FeedbackFilterPanel, FeedbackFilters, defaultFilters } from '@/components/feedback/FeedbackFilterPanel';
+import { FeedbackDetail } from '@/components/feedback/FeedbackDetail';
 
 interface PaginationInfo {
   page: number;
@@ -42,6 +43,9 @@ export default function FeedbacksPage() {
     totalPages: 0,
     hasMore: false,
   });
+  
+  // State for the detail modal
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
 
   // Load user and project
   useEffect(() => {
@@ -138,6 +142,21 @@ export default function FeedbacksPage() {
 
   const handleClearFilters = () => {
     setFilters(defaultFilters);
+  };
+
+  const handleFeedbackClick = (feedback: Feedback) => {
+    setSelectedFeedback(feedback);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedFeedback(null);
+  };
+
+  const handleUpdateFeedback = (updatedFeedback: Feedback) => {
+    setFeedbacks(prev => 
+      prev.map(f => f.id === updatedFeedback.id ? updatedFeedback : f)
+    );
+    setSelectedFeedback(updatedFeedback);
   };
 
   const isPro = project?.plan === 'pro' && project?.subscription_status === 'active';
@@ -365,10 +384,7 @@ export default function FeedbacksPage() {
                 <FeedbackCard
                   key={feedback.id}
                   feedback={feedback}
-                  onClick={() => {
-                    // TODO: Navigate to detail page (ST-13)
-                    console.log('View feedback:', feedback.id);
-                  }}
+                  onClick={() => handleFeedbackClick(feedback)}
                 />
               ))}
 
@@ -423,6 +439,15 @@ export default function FeedbacksPage() {
           )}
         </div>
       </div>
+
+      {/* Feedback Detail Modal */}
+      {selectedFeedback && (
+        <FeedbackDetail
+          feedback={selectedFeedback}
+          onClose={handleCloseDetail}
+          onUpdate={handleUpdateFeedback}
+        />
+      )}
     </div>
   );
 }
