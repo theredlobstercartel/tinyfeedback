@@ -47,7 +47,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Update project with subscription info
         const { error } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .update({
             stripe_subscription_id: subscriptionId,
             subscription_status: subscription.status,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Update subscription period
         const { error } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .update({
             subscription_status: subscription.status,
             subscription_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Update subscription status to past_due
         const { error } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .update({
             subscription_status: 'past_due',
             updated_at: new Date().toISOString(),
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const subscription = event.data.object as Stripe.Subscription;
 
         const { error } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .update({
             subscription_status: subscription.status,
             subscription_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const subscription = event.data.object as Stripe.Subscription;
 
         const { error } = await supabase
-          .from('projects')
+          .from('bmad_projects')
           .update({
             subscription_status: 'canceled',
             plan: 'free',
