@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { LogOut, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -14,11 +16,26 @@ export default function DashboardPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      // Check if user has any projects
+      if (user) {
+        const { data: projects, error } = await supabase
+          .from('projects')
+          .select('id')
+          .limit(1);
+
+        // If no projects, redirect to onboarding
+        if (!error && (!projects || projects.length === 0)) {
+          router.push('/onboarding');
+          return;
+        }
+      }
+
       setIsLoading(false);
     };
 
     getUser();
-  }, []);
+  }, [router]);
 
   const handleLogout = async () => {
     const supabase = createClient();
