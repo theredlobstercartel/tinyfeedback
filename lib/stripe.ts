@@ -7,24 +7,40 @@ import type {
   WebhookProcessingResult 
 } from '@/types';
 
-// Initialize Stripe with secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-01-27.acacia',
-});
+// Lazy initialization of Stripe client
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error('STRIPE_SECRET_KEY not set');
+    }
+    stripeInstance = new Stripe(secretKey, {
+      apiVersion: '2024-12-18.acacia',
+    });
+  }
+  return stripeInstance;
+}
 
 /**
  * Verify Stripe webhook signature
  */
 export function verifyWebhookSignature(
-  payload: string,
+  payload: string | Buffer,
   signature: string,
-  secret: string
+  secret?: string
 ): StripeWebhookEvent {
+  const webhookSecret = secret || process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    throw new Error('STRIPE_WEBHOOK_SECRET not set');
+  }
+  
   try {
-    const event = stripe.webhooks.constructEvent(
+    const event = getStripe().webhooks.constructEvent(
       payload,
       signature,
-      secret
+      webhookSecret
     ) as StripeWebhookEvent;
     return event;
   } catch (error) {
@@ -54,7 +70,7 @@ async function findProjectByStripeCustomerId(customerId: string) {
 /**
  * Activate Pro plan for project
  */
-async function activateProPlan(
+export async function activateProPlan(
   projectId: string, 
   subscriptionId: string,
   currentPeriodEnd: number
@@ -87,7 +103,7 @@ async function activateProPlan(
 /**
  * Downgrade project to Free plan
  */
-async function downgradeToFree(projectId: string): Promise<WebhookProcessingResult> {
+export async function downgradeToFree(projectId: string): Promise<WebhookProcessingResult> {
   const supabase = createAdminClient();
   
   const { error } = await supabase
@@ -116,7 +132,7 @@ async function downgradeToFree(projectId: string): Promise<WebhookProcessingResu
 /**
  * Mark payment as failed and notify founder
  */
-async function handlePaymentFailed(
+export async function handlePaymentFailed(
   projectId: string,
   paymentIntentId: string,
   errorMessage: string
@@ -137,7 +153,6 @@ async function handlePaymentFailed(
   }
   
   // TODO: Send notification to founder
-  // This would integrate with email service
   console.log(`[Payment Failed] Project: ${projectId}, PaymentIntent: ${paymentIntentId}, Error: ${errorMessage}`);
   
   return {
@@ -146,6 +161,28 @@ async function handlePaymentFailed(
     action: 'payment_failed',
     projectId,
   };
+}
+
+/**
+ * Log webhook event for auditing
+ */
+async function logWebhookEvent(event: {
+  project_id: string;
+  event_type: string;
+  stripe_event_id: string;
+  status: string;
+  details?: Record<string, unknown>;
+  requires_retry?: boolean;
+}): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    await supabase.from('webhook_events').insert({
+      ...event,
+      created_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error logging webhook event:', error);
+  }
 }
 
 /**
@@ -197,9 +234,31 @@ export async function processWebhookEvent(
       
       // Downgrade at end of period
       if (subscription.cancel_at_period_end) {
+        // Update to mark as will be canceled
+        const supabase = createAdminClient();
+        await supabase
+          .from('projects')
+          .update({
+            subscription_status: 'canceled',
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', project.id);
+        
+        await logWebhookEvent({
+          project_id: project.id,
+          event_type: 'customer.subscription.deleted',
+          stripe_event_id: subscription.id,
+          status: 'canceled',
+          details: { 
+            cancel_at_period_end: true,
+            current_period_end: subscription.current_period_end 
+          },
+        });
+        
         return {
           success: true,
-          message: 'Subscription will be canceled at period end',
+          message: 'Subscription will be canceled at period end, downgrade scheduled',
           action: 'schedule_downgrade',
           projectId: project.id,
         };
@@ -215,7 +274,7 @@ export async function processWebhookEvent(
       const project = await findProjectByStripeCustomerId(customerId);
       
       // Handle status changes
-      if (subscription.status === 'active') {
+      if (subscription.status === 'active' || subscription.status === 'trialing') {
         return await activateProPlan(
           project.id,
           subscription.id,
@@ -226,6 +285,13 @@ export async function processWebhookEvent(
       if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
         return await downgradeToFree(project.id);
       }
+      
+      await logWebhookEvent({
+        project_id: project.id,
+        event_type: 'customer.subscription.updated',
+        stripe_event_id: subscription.id,
+        status: subscription.status,
+      });
       
       return {
         success: true,
