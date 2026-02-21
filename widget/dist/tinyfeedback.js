@@ -1396,71 +1396,149 @@ var TinyFeedback = (function (exports) {
     }
 
     /**
-     * Floating Button Component
-     * Story: ST-05 - Criar Widget Vanilla JS
-     * AC-02: Botão flutuante
+     * TinyFeedback Widget
+     * Main entry point for the vanilla JS widget
+     * ST-05: Criar Widget Vanilla JS (<20KB)
      */
-    class FloatingButton {
-        constructor(options = {}) {
-            this.button = null;
+    class TinyFeedbackWidget {
+        constructor(config) {
+            this.npsModal = null;
+            this.suggestionModal = null;
+            this.bugModal = null;
+            this.floatingButton = null;
             this.menuContainer = null;
             this.isMenuOpen = false;
             /**
-             * Handle clicks outside the menu
+             * Handle outside click to close menu
              */
             this.handleOutsideClick = (e) => {
-                if (this.menuContainer &&
-                    !this.menuContainer.contains(e.target) &&
-                    !this.button?.contains(e.target)) {
-                    this.closeMenu();
+                if (this.menuContainer && !this.menuContainer.contains(e.target)) {
+                    if (this.floatingButton && !this.floatingButton.contains(e.target)) {
+                        this.closeMenu();
+                    }
                 }
             };
-            this.options = {
-                position: options.position || 'bottom-right',
-                color: options.color || '#00ff88',
-                text: options.text || 'Feedback',
-                onClick: options.onClick || (() => { })
+            this.config = {
+                apiUrl: '',
+                position: 'bottom-right',
+                primaryColor: '#3b82f6',
+                buttonText: 'Feedback',
+                ...config
             };
-        }
-        /**
-         * Mount the floating button to the DOM
-         */
-        mount() {
-            if (this.button)
-                return; // Already mounted
-            this.button = document.createElement('button');
-            this.button.id = 'tf-floating-btn';
-            this.button.innerHTML = this.getButtonIcon();
-            this.button.style.cssText = this.getButtonStyles();
-            this.button.setAttribute('aria-label', 'Abrir feedback');
-            // Add click handler
-            this.button.addEventListener('click', () => this.toggleMenu());
-            document.body.appendChild(this.button);
-        }
-        /**
-         * Unmount the button from the DOM
-         */
-        unmount() {
-            this.closeMenu();
-            if (this.button) {
-                this.button.remove();
-                this.button = null;
+            // If no apiUrl provided, infer from script src
+            if (!this.config.apiUrl) {
+                this.config.apiUrl = this.inferApiUrl();
             }
         }
         /**
-         * Update button options
+         * Initialize the widget with floating button
          */
-        update(options) {
-            this.options = { ...this.options, ...options };
-            if (this.button) {
-                this.button.style.cssText = this.getButtonStyles();
+        init() {
+            this.validateDomain().then((isValid) => {
+                if (isValid) {
+                    this.fetchAppearance().then((appearance) => {
+                        if (appearance) {
+                            this.config.primaryColor = appearance.primary_color;
+                            this.config.buttonText = appearance.button_text;
+                            this.config.position = appearance.position;
+                        }
+                        this.createFloatingButton();
+                    });
+                }
+                else {
+                    console.error('[TinyFeedback] Domain not authorized. Widget will not load.');
+                }
+            });
+        }
+        /**
+         * Validate domain against API
+         */
+        async validateDomain() {
+            try {
+                const origin = window.location.origin;
+                const response = await fetch(`${this.config.apiUrl}/api/widget/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': this.config.apiKey
+                    },
+                    body: JSON.stringify({
+                        projectId: this.config.projectId,
+                        domain: origin
+                    })
+                });
+                return response.ok;
+            }
+            catch (error) {
+                // If validation fails, still allow (fail open for development)
+                console.warn('[TinyFeedback] Domain validation failed:', error);
+                return true;
             }
         }
         /**
-         * Set callback for menu selection
+         * Fetch widget appearance from API
          */
-        onSelect(callback) {
-            this.onSelectCallback = callback;
+        async fetchAppearance() {
+            try {
+                const response = await fetch(`${this.config.apiUrl}/api/projects/${this.config.projectId}/widget-appearance`, {
+                    headers: {
+                        'X-API-Key': this.config.apiKey
+                    }
+                });
+                if (response.ok) {
+                    return await response.json();
+                }
+            }
+            catch (error) {
+                console.warn('[TinyFeedback] Failed to fetch appearance:', error);
+            }
+            return null;
+        }
+        /**
+         * Create the floating button
+         */
+        createFloatingButton() {
+            const button = document.createElement('button');
+            button.id = 'tinyfeedback-button';
+            button.innerHTML = this.config.buttonText;
+            button.style.cssText = this.getButtonStyles();
+            button.addEventListener('click', () => this.toggleMenu());
+            document.body.appendChild(button);
+            this.floatingButton = button;
+        }
+        /**
+         * Get button styles based on position
+         */
+        getButtonStyles() {
+            const baseStyles = `
+      position: fixed;
+      ${this.getPositionStyles()}
+      padding: 12px 20px;
+      background: ${this.config.primaryColor};
+      color: white;
+      border: none;
+      border-radius: 9999px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 2147483646;
+      transition: transform 0.2s, box-shadow 0.2s;
+    `;
+            return baseStyles;
+        }
+        /**
+         * Get position-specific styles
+         */
+        getPositionStyles() {
+            const positions = {
+                'bottom-right': 'bottom: 20px; right: 20px;',
+                'bottom-left': 'bottom: 20px; left: 20px;',
+                'top-right': 'top: 20px; right: 20px;',
+                'top-left': 'top: 20px; left: 20px;'
+            };
+            return positions[this.config.position] || positions['bottom-right'];
         }
         /**
          * Toggle the feedback menu
@@ -1474,389 +1552,183 @@ var TinyFeedback = (function (exports) {
             }
         }
         /**
-         * Open the feedback type menu
+         * Open the feedback menu
          */
         openMenu() {
-            if (!this.button || this.isMenuOpen)
+            if (!this.floatingButton)
                 return;
+            const menu = document.createElement('div');
+            menu.id = 'tinyfeedback-menu';
+            menu.style.cssText = this.getMenuStyles();
+            menu.innerHTML = `
+      <div style="padding: 8px;">
+        <button class="tf-menu-item" data-type="nps" style="${this.getMenuItemStyles()}">
+          <span style="font-size: 18px; margin-right: 8px;">📊</span>
+          <span>Avaliação (NPS)</span>
+        </button>
+        <button class="tf-menu-item" data-type="suggestion" style="${this.getMenuItemStyles()}">
+          <span style="font-size: 18px; margin-right: 8px;">💡</span>
+          <span>Sugestão</span>
+        </button>
+        <button class="tf-menu-item" data-type="bug" style="${this.getMenuItemStyles()}">
+          <span style="font-size: 18px; margin-right: 8px;">🐛</span>
+          <span>Reportar Bug</span>
+        </button>
+      </div>
+    `;
+            document.body.appendChild(menu);
+            this.menuContainer = menu;
             this.isMenuOpen = true;
-            // Create menu container
-            this.menuContainer = document.createElement('div');
-            this.menuContainer.id = 'tf-menu-container';
-            this.menuContainer.style.cssText = this.getMenuContainerStyles();
-            // Menu items
-            const menuItems = [
-                { type: 'nps', icon: '📊', label: 'Avaliação', color: '#00ff88' },
-                { type: 'suggestion', icon: '💡', label: 'Sugestão', color: '#ffaa00' },
-                { type: 'bug', icon: '🐛', label: 'Reportar Bug', color: '#ff4444' }
-            ];
-            menuItems.forEach((item, index) => {
-                const menuItem = document.createElement('button');
-                menuItem.className = 'tf-menu-item';
-                menuItem.style.cssText = this.getMenuItemStyles(item.color, index);
-                menuItem.innerHTML = `
-        <span style="font-size: 20px;">${item.icon}</span>
-        <span style="font-size: 14px; font-weight: 500;">${item.label}</span>
-      `;
-                menuItem.addEventListener('click', () => {
-                    this.closeMenu();
-                    this.onSelectCallback?.(item.type);
-                });
-                this.menuContainer?.appendChild(menuItem);
-            });
-            document.body.appendChild(this.menuContainer);
-            // Animate items in
-            requestAnimationFrame(() => {
-                const items = this.menuContainer?.querySelectorAll('.tf-menu-item');
-                items?.forEach((item, i) => {
-                    setTimeout(() => {
-                        item.style.opacity = '1';
-                        item.style.transform = 'translateY(0)';
-                    }, i * 50);
+            // Attach click handlers
+            menu.querySelectorAll('.tf-menu-item').forEach((item) => {
+                item.addEventListener('click', (e) => {
+                    const type = e.currentTarget.getAttribute('data-type');
+                    this.handleMenuSelection(type);
                 });
             });
-            // Close menu when clicking outside
-            document.addEventListener('click', this.handleOutsideClick);
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', this.handleOutsideClick);
+            }, 0);
         }
         /**
-         * Close the menu
+         * Close the feedback menu
          */
         closeMenu() {
-            if (!this.menuContainer)
-                return;
+            if (this.menuContainer) {
+                this.menuContainer.remove();
+                this.menuContainer = null;
+            }
             this.isMenuOpen = false;
-            this.menuContainer.remove();
-            this.menuContainer = null;
             document.removeEventListener('click', this.handleOutsideClick);
         }
         /**
-         * Get button SVG icon
+         * Handle menu selection
          */
-        getButtonIcon() {
-            return `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3.00003H13C15.0843 3.11502 17.053 3.99479 18.5291 5.47089C20.0052 6.94699 20.885 8.91568 21 11V11.5Z" 
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
+        handleMenuSelection(type) {
+            this.closeMenu();
+            switch (type) {
+                case 'nps':
+                    this.openNPS();
+                    break;
+                case 'suggestion':
+                    this.openSuggestion();
+                    break;
+                case 'bug':
+                    this.openBug();
+                    break;
+            }
         }
         /**
-         * Get button position styles
+         * Get menu styles
          */
-        getPositionStyles() {
-            const positions = {
-                'bottom-right': 'bottom: 24px; right: 24px;',
-                'bottom-left': 'bottom: 24px; left: 24px;',
-                'top-right': 'top: 24px; right: 24px;',
-                'top-left': 'top: 24px; left: 24px;'
-            };
-            return positions[this.options.position];
-        }
-        /**
-         * Get button styles
-         */
-        getButtonStyles() {
-            const positionStyles = this.getPositionStyles();
-            return `
-      position: fixed;
-      ${positionStyles}
-      width: 56px;
-      height: 56px;
-      border-radius: 0;
-      background: ${this.options.color};
-      color: #000;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 20px ${this.options.color}40;
-      z-index: 999998;
-      transition: all 0.3s ease;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-        }
-        /**
-         * Get menu container styles
-         */
-        getMenuContainerStyles() {
+        getMenuStyles() {
             const positionStyles = this.getMenuPositionStyles();
             return `
       position: fixed;
       ${positionStyles}
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 999997;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      z-index: 2147483647;
+      min-width: 200px;
+      animation: tf-menu-appear 0.2s ease-out;
     `;
         }
         /**
-         * Get menu position based on button position
+         * Get menu position styles
          */
         getMenuPositionStyles() {
             const positions = {
-                'bottom-right': 'bottom: 88px; right: 24px;',
-                'bottom-left': 'bottom: 88px; left: 24px;',
-                'top-right': 'top: 88px; right: 24px;',
-                'top-left': 'top: 88px; left: 24px;'
+                'bottom-right': 'bottom: 80px; right: 20px;',
+                'bottom-left': 'bottom: 80px; left: 20px;',
+                'top-right': 'top: 80px; right: 20px;',
+                'top-left': 'top: 80px; left: 20px;'
             };
-            return positions[this.options.position];
+            return positions[this.config.position] || positions['bottom-right'];
         }
         /**
          * Get menu item styles
          */
-        getMenuItemStyles(color, index) {
+        getMenuItemStyles() {
             return `
       display: flex;
       align-items: center;
-      gap: 12px;
+      width: 100%;
       padding: 12px 16px;
-      background: #111;
-      border: 1px solid ${color}40;
-      color: #fff;
+      background: none;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
-      min-width: 160px;
-      transition: all 0.2s ease;
-      opacity: 0;
-      transform: translateY(10px);
+      font-family: inherit;
+      font-size: 14px;
+      color: #374151;
+      transition: background 0.15s;
+      text-align: left;
     `;
         }
-    }
-
-    /**
-     * TinyFeedback Widget - Main Entry Point
-     * Story: ST-05 - Criar Widget Vanilla JS (<20KB)
-     *
-     * Lightweight vanilla JS widget for collecting user feedback
-     * Features: Floating button, NPS modal, Suggestion modal, Bug report modal
-     */
-    /**
-     * Main TinyFeedback Widget Class
-     * AC-01: Script embeddável
-     * AC-02: Botão flutuante
-     * AC-03: Abrir modal
-     * AC-04: CORS configurado
-     */
-    class TinyFeedbackWidget {
-        constructor(config) {
-            this.floatingButton = null;
-            this.currentModal = null;
-            this.appearance = null;
-            this.isDomainValid = true;
-            this.initialized = false;
-            this.config = {
-                apiUrl: '',
-                position: 'bottom-right',
-                color: '#00ff88',
-                text: 'Feedback',
-                autoMount: true,
-                ...config
-            };
-            // Infer API URL from script src if not provided
-            if (!this.config.apiUrl) {
-                this.config.apiUrl = this.inferApiUrl();
-            }
-            // Validate config
-            if (!this.config.projectId || !this.config.apiKey) {
-                console.error('[TinyFeedback] projectId and apiKey are required');
-                return;
-            }
-            // Auto-mount if enabled
-            if (this.config.autoMount) {
-                this.init();
-            }
-        }
         /**
-         * Initialize the widget
-         * AC-04: Validate domain before mounting
+         * Open the NPS feedback modal
          */
-        async init() {
-            if (this.initialized)
-                return;
-            try {
-                // Validate domain
-                await this.validateDomain();
-                if (!this.isDomainValid) {
-                    console.error('[TinyFeedback] Domain not authorized. Widget will not be displayed.');
-                    return;
-                }
-                // Fetch appearance settings
-                await this.fetchAppearance();
-                // Mount floating button
-                this.mountButton();
-                this.initialized = true;
+        openNPS() {
+            if (this.npsModal) {
+                this.npsModal.close();
             }
-            catch (error) {
-                console.error('[TinyFeedback] Failed to initialize widget:', error);
-            }
-        }
-        /**
-         * Validate domain against allowed domains
-         * AC-04: CORS configurado - Domain validation
-         */
-        async validateDomain() {
-            try {
-                const response = await fetch(`${this.config.apiUrl}/api/projects/${this.config.projectId}/domains`, {
-                    method: 'GET',
-                    headers: {
-                        'X-API-Key': this.config.apiKey
-                    }
-                });
-                if (!response.ok) {
-                    if (response.status === 403) {
-                        console.error('[TinyFeedback] Domain not authorized');
-                        this.isDomainValid = false;
-                        return;
-                    }
-                    // If we can't validate, assume valid (fail open for better UX)
-                    this.isDomainValid = true;
-                    return;
-                }
-                const data = await response.json();
-                // If no allowed_domains configured, allow all
-                if (!data.data?.allowed_domains || data.data.allowed_domains.length === 0) {
-                    this.isDomainValid = true;
-                    return;
-                }
-                // Check current domain
-                const currentDomain = window.location.hostname;
-                const isAllowed = data.data.allowed_domains.some((domain) => {
-                    return currentDomain === domain || currentDomain.endsWith(`.${domain}`);
-                });
-                if (!isAllowed) {
-                    console.error(`[TinyFeedback] Domain "${currentDomain}" not in allowed domains:`, data.data.allowed_domains);
-                    this.isDomainValid = false;
-                }
-            }
-            catch (error) {
-                // Fail open if validation fails
-                console.warn('[TinyFeedback] Could not validate domain, allowing widget:', error);
-                this.isDomainValid = true;
-            }
-        }
-        /**
-         * Fetch widget appearance settings
-         */
-        async fetchAppearance() {
-            try {
-                const response = await fetch(`${this.config.apiUrl}/api/projects/${this.config.projectId}/widget-appearance`, {
-                    method: 'GET',
-                    headers: {
-                        'X-API-Key': this.config.apiKey
-                    }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    this.appearance = data.data;
-                    // Update config with API settings
-                    if (this.appearance) {
-                        this.config.color = this.appearance.widget_color || this.config.color;
-                        this.config.position = this.appearance.widget_position || this.config.position;
-                        this.config.text = this.appearance.widget_text || this.config.text;
-                    }
-                }
-            }
-            catch (error) {
-                // Use default settings if fetch fails
-                console.warn('[TinyFeedback] Could not fetch appearance settings:', error);
-            }
-        }
-        /**
-         * Mount the floating button
-         * AC-02: Botão flutuante com posição e cor configuráveis
-         */
-        mountButton() {
-            this.floatingButton = new FloatingButton({
-                position: this.config.position,
-                color: this.config.color,
-                text: this.config.text
-            });
-            this.floatingButton.onSelect((type) => {
-                this.openModal(type);
-            });
-            this.floatingButton.mount();
-        }
-        /**
-         * Open a specific modal
-         * AC-03: Abrir modal com 3 opções
-         */
-        openModal(type) {
-            // Close any existing modal
-            this.closeCurrentModal();
-            const modalOptions = {
+            this.npsModal = new NPSModal({
                 projectId: this.config.projectId,
                 apiKey: this.config.apiKey,
                 apiUrl: this.config.apiUrl,
                 onClose: () => {
-                    this.currentModal = null;
+                    this.npsModal = null;
                 }
-            };
-            switch (type) {
-                case 'nps':
-                    this.currentModal = new NPSModal(modalOptions);
-                    this.currentModal.open();
-                    break;
-                case 'suggestion':
-                    this.currentModal = new SuggestionModal(modalOptions);
-                    this.currentModal.open();
-                    break;
-                case 'bug':
-                    this.currentModal = new BugModal(modalOptions);
-                    this.currentModal.open();
-                    break;
-            }
+            });
+            this.npsModal.open();
         }
         /**
-         * Legacy method - Open NPS modal directly
-         */
-        openNPS() {
-            this.openModal('nps');
-        }
-        /**
-         * Legacy method - Open Suggestion modal directly
+         * Open the Suggestion modal
          */
         openSuggestion() {
-            this.openModal('suggestion');
+            if (this.suggestionModal) {
+                this.suggestionModal.close();
+            }
+            this.suggestionModal = new SuggestionModal({
+                projectId: this.config.projectId,
+                apiKey: this.config.apiKey,
+                apiUrl: this.config.apiUrl,
+                onClose: () => {
+                    this.suggestionModal = null;
+                }
+            });
+            this.suggestionModal.open();
         }
         /**
-         * Open Bug report modal directly
+         * Open the Bug Report modal
          */
         openBug() {
-            this.openModal('bug');
+            if (this.bugModal) {
+                this.bugModal.close();
+            }
+            this.bugModal = new BugModal({
+                projectId: this.config.projectId,
+                apiKey: this.config.apiKey,
+                apiUrl: this.config.apiUrl,
+                onClose: () => {
+                    this.bugModal = null;
+                }
+            });
+            this.bugModal.open();
         }
         /**
-         * Close current modal
-         */
-        closeCurrentModal() {
-            this.currentModal?.close();
-            this.currentModal = null;
-        }
-        /**
-         * Close all modals and menu
+         * Close any open modals
          */
         close() {
-            this.closeCurrentModal();
-        }
-        /**
-         * Destroy the widget
-         */
-        destroy() {
-            this.close();
-            this.floatingButton?.unmount();
-            this.floatingButton = null;
-            this.initialized = false;
-        }
-        /**
-         * Update widget configuration
-         */
-        update(config) {
-            this.config = { ...this.config, ...config };
-            this.floatingButton?.update({
-                position: this.config.position,
-                color: this.config.color,
-                text: this.config.text
-            });
+            this.npsModal?.close();
+            this.npsModal = null;
+            this.suggestionModal?.close();
+            this.suggestionModal = null;
+            this.bugModal?.close();
+            this.bugModal = null;
+            this.closeMenu();
         }
         /**
          * Infer API URL from the script src
@@ -1870,34 +1742,45 @@ var TinyFeedback = (function (exports) {
                     return `${url.protocol}//${url.host}`;
                 }
             }
-            return window.location.origin;
-        }
-        /**
-         * Get widget version
-         */
-        static get version() {
-            return '0.2.0';
+            return '';
         }
     }
     // Auto-initialize if config is present in window
     if (typeof window !== 'undefined') {
         window.TinyFeedback = TinyFeedbackWidget;
+        window.TinyFeedbackWidget = TinyFeedbackWidget;
         // Check for auto-initialize config
-        if (window.__TF_CONFIG__?.projectId && window.__TF_CONFIG__?.apiKey) {
-            const widget = new TinyFeedbackWidget(window.__TF_CONFIG__);
-            // Expose init function for manual initialization
-            window.__TF_INIT__ = () => widget.init();
+        const tfConfig = window.__TF_CONFIG__;
+        if (tfConfig?.projectId && tfConfig?.apiKey) {
+            const widget = new TinyFeedbackWidget(tfConfig);
+            widget.init();
+            // Store instance globally
+            window.__TF_WIDGET__ = widget;
+            // Auto-open NPS if triggered
+            if (window.__TF_OPEN_NPS__) {
+                widget.openNPS();
+            }
+            // Auto-open Suggestion if triggered
+            if (window.__TF_OPEN_SUGGESTION__) {
+                widget.openSuggestion();
+            }
         }
     }
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+  @keyframes tf-menu-appear {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .tf-menu-item:hover { background: #f3f4f6 !important; }
+`;
+    document.head?.appendChild(style);
 
     exports.BugModal = BugModal;
-    exports.FloatingButton = FloatingButton;
     exports.NPSModal = NPSModal;
     exports.SuggestionModal = SuggestionModal;
     exports.TinyFeedbackWidget = TinyFeedbackWidget;
-    exports.default = TinyFeedbackWidget;
-
-    Object.defineProperty(exports, '__esModule', { value: true });
 
     return exports;
 
