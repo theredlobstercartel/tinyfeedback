@@ -1,412 +1,459 @@
 import Link from 'next/link';
-import { 
-  MessageSquare, 
-  BarChart3, 
-  Zap, 
-  Shield, 
-  Code2, 
-  Bell,
-  ArrowRight,
-  Check,
-  Star
-} from 'lucide-react';
-
-export const metadata = {
-  title: 'TinyFeedback - Collect User Feedback That Actually Matters',
-  description: 'The modern feedback platform for SaaS products. Collect, analyze, and act on user feedback with AI-powered insights.',
-};
+import { MessageSquare, BarChart3, Zap, Shield, CheckCircle2, ArrowRight, Star, Users } from 'lucide-react';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-black">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-[#222222]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-6 h-6 text-[#00ff88]" />
-              <span className="text-xl font-bold text-white">TinyFeedback</span>
-            </div>
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-[#888888] hover:text-[#00ff88] transition-colors">Features</a>
-              <a href="#pricing" className="text-[#888888] hover:text-[#00ff88] transition-colors">Pricing</a>
-              <a href="/demo" className="text-[#888888] hover:text-[#00ff88] transition-colors">Demo</a>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/login" 
-                className="text-[#888888] hover:text-white transition-colors hidden sm:block"
-              >
-                Sign In
-              </Link>
-              <Link 
-                href="/signup"
-                className="px-4 py-2 bg-[#00ff88] text-black font-medium hover:bg-[#00ffaa] transition-colors"
-              >
-                Get Started
-              </Link>
-            </div>
+    <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
+      {/* Navbar */}
+      <nav className="border-b px-6 py-4" style={{ borderColor: '#222222' }}>
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-6 h-6" style={{ color: '#00ff88' }} />
+            <span className="text-xl font-bold" style={{ color: '#ffffff' }}>
+              TinyFeedback
+            </span>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link 
+              href="/demo" 
+              className="text-sm transition-colors hover:text-white"
+              style={{ color: '#888888' }}
+            >
+              Demo
+            </Link>
+            <Link 
+              href="/login" 
+              className="text-sm transition-colors hover:text-white"
+              style={{ color: '#888888' }}
+            >
+              Login
+            </Link>
+            <Link
+              href="/signup"
+              className="px-4 py-2 text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: '#00ff88',
+                color: '#000000',
+              }}
+            >
+              Get Started Free
+            </Link>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#00ff88]/10 border border-[#00ff88]/30">
-                <Star className="w-4 h-4 text-[#00ff88]" />
-                <span className="text-sm text-[#00ff88]">Now with AI-powered insights</span>
-              </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight">
-                Collect User Feedback{' '}
-                <span className="text-[#00ff88] neon-text">That Actually Matters</span>
-              </h1>
-              <p className="text-lg text-[#888888] max-w-xl">
-                TinyFeedback is the modern feedback platform for SaaS products. 
-                Embed our widget in minutes, collect actionable insights, and 
-                build products your users actually want.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link 
-                  href="/signup"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#00ff88] text-black font-medium hover:bg-[#00ffaa] transition-colors group"
-                >
-                  Start Free Trial
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link 
-                  href="/demo"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-[#00ff88] text-[#00ff88] font-medium hover:bg-[#00ff88]/10 transition-colors"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  View Demo
-                </Link>
-              </div>
-              <div className="flex items-center gap-6 text-sm text-[#888888]">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00ff88]" />
-                  <span>No credit card required</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00ff88]" />
-                  <span>14-day free trial</span>
-                </div>
-              </div>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#00ff88]/20 to-[#00d4ff]/20 blur-3xl" />
-              <div className="relative bg-[#0a0a0a] border border-[#222222] p-6 space-y-4">
-                <div className="flex items-center gap-2 pb-4 border-b border-[#222222]">
-                  <div className="w-3 h-3 bg-[#ff5f56]" />
-                  <div className="w-3 h-3 bg-[#ffbd2e]" />
-                  <div className="w-3 h-3 bg-[#27ca40]" />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-[#111111] border border-[#222222]">
-                    <div className="w-8 h-8 bg-[#00ff88]/20 flex items-center justify-center">
-                      <MessageSquare className="w-4 h-4 text-[#00ff88]" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-white text-sm font-medium">New Feature Request</p>
-                      <p className="text-[#888888] text-xs">Add dark mode support for better UX at night...</p>
-                      <div className="flex items-center gap-2 pt-2">
-                        <span className="px-2 py-0.5 text-xs bg-[#00ff88]/20 text-[#00ff88]">suggestion</span>
-                        <span className="px-2 py-0.5 text-xs bg-[#222222] text-[#888888]">new</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-[#111111] border border-[#222222]">
-                    <div className="w-8 h-8 bg-[#00d4ff]/20 flex items-center justify-center">
-                      <BarChart3 className="w-4 h-4 text-[#00d4ff]" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-white text-sm font-medium">NPS Score: 72</p>
-                      <p className="text-[#888888] text-xs">Based on 142 responses this month</p>
-                      <div className="w-full h-2 bg-[#222222] mt-2">
-                        <div className="w-3/4 h-full bg-gradient-to-r from-[#00ff88] to-[#00d4ff]" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-[#111111] border border-[#222222]">
-                    <div className="w-8 h-8 bg-[#ffaa00]/20 flex items-center justify-center">
-                      <Bell className="w-4 h-4 text-[#ffaa00]" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-white text-sm font-medium">Daily Summary Ready</p>
-                      <p className="text-[#888888] text-xs">12 new feedback items to review</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <section className="px-6 py-24">
+        <div className="max-w-4xl mx-auto text-center space-y-8">
+          <div 
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm"
+            style={{ 
+              backgroundColor: '#0a0a0a', 
+              border: '1px solid #222222',
+              color: '#00ff88'
+            }}
+          >
+            <Star className="w-4 h-4" />
+            <span>Free for up to 100 feedbacks/month</span>
+          </div>
+          
+          <h1 
+            className="text-5xl md:text-6xl font-bold leading-tight"
+            style={{ color: '#ffffff' }}
+          >
+            Collect Feedback from Your
+            <span style={{ color: '#00ff88' }}> SaaS Users</span>
+            <br />in Seconds
+          </h1>
+          
+          <p className="text-xl max-w-2xl mx-auto" style={{ color: '#888888' }}>
+            One line of code. NPS scores, feature requests, and bug reports 
+            directly from your app. No complex setup, no hefty price tags.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/signup"
+              className="px-8 py-4 text-lg font-medium transition-colors flex items-center gap-2"
+              style={{
+                backgroundColor: '#00ff88',
+                color: '#000000',
+              }}
+            >
+              Start Free Today
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link
+              href="/demo"
+              className="px-8 py-4 text-lg font-medium transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#ffffff',
+                border: '1px solid #333333',
+              }}
+            >
+              See Demo
+            </Link>
+          </div>
+
+          <p className="text-sm" style={{ color: '#666666' }}>
+            No credit card required • Setup in 2 minutes
+          </p>
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className="px-6 py-12 border-y" style={{ borderColor: '#111111', backgroundColor: '#0a0a0a' }}>
+        <div className="max-w-6xl mx-auto text-center space-y-4">
+          <p className="text-sm uppercase tracking-wider" style={{ color: '#666666' }}>
+            Trusted by indie hackers and solopreneurs
+          </p>
+          <div className="flex items-center justify-center gap-8 text-lg" style={{ color: '#444444' }}>
+            <span>"Simple and effective"</span>
+            <span>•</span>
+            <span>"Took 5 minutes to set up"</span>
+            <span>•</span>
+            <span>"Finally, affordable feedback"</span>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 border-t border-[#222222]">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Everything You Need to{' '}
-              <span className="text-[#00ff88]">Understand Your Users</span>
+      <section className="px-6 py-24">
+        <div className="max-w-6xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#ffffff' }}>
+              Everything You Need, Nothing You Don't
             </h2>
-            <p className="text-[#888888]">
-              Powerful features designed to help you collect, analyze, and act on user feedback
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: '#888888' }}>
+              Stop overpaying for bloated feedback tools. TinyFeedback gives you exactly what you need to understand your users.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Code2,
-                title: 'One-Line Integration',
-                description: 'Drop our script tag into your HTML and start collecting feedback in under 60 seconds.',
-                color: '#00ff88',
-              },
-              {
-                icon: MessageSquare,
-                title: 'Smart Widget',
-                description: 'Beautiful, customizable feedback widget that matches your brand perfectly.',
-                color: '#00d4ff',
-              },
-              {
-                icon: BarChart3,
-                title: 'Analytics Dashboard',
-                description: 'Track NPS scores, sentiment trends, and feature requests in real-time.',
-                color: '#ffaa00',
-              },
-              {
-                icon: Bell,
-                title: 'Smart Notifications',
-                description: 'Get notified about critical feedback instantly. Never miss what matters.',
-                color: '#ff4444',
-              },
-              {
-                icon: Shield,
-                title: 'Enterprise Security',
-                description: 'SOC 2 compliant, GDPR ready, and end-to-end encrypted data storage.',
-                color: '#00ff88',
-              },
-              {
-                icon: Zap,
-                title: 'AI-Powered Insights',
-                description: 'Our AI automatically categorizes feedback and surfaces actionable insights.',
-                color: '#00d4ff',
-              },
-            ].map((feature, index) => (
-              <div 
-                key={index}
-                className="group p-6 bg-[#0a0a0a] border border-[#222222] hover:border-[#00ff88]/50 transition-all"
-              >
-                <div 
-                  className="w-12 h-12 mb-4 flex items-center justify-center"
-                  style={{ backgroundColor: `${feature.color}20` }}
-                >
-                  <feature.icon className="w-6 h-6" style={{ color: feature.color }} />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-[#888888] text-sm">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Stats Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[#0a0a0a] border-y border-[#222222]">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { value: '10M+', label: 'Feedback Collected' },
-              { value: '2,500+', label: 'Active Teams' },
-              { value: '99.9%', label: 'Uptime SLA' },
-              { value: '<50ms', label: 'Response Time' },
-            ].map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl sm:text-4xl font-bold text-[#00ff88] mb-2">{stat.value}</div>
-                <div className="text-[#888888] text-sm">{stat.label}</div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <MessageSquare className="w-6 h-6" style={{ color: '#00ff88' }} />
               </div>
-            ))}
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                One-Line Installation
+              </h3>
+              <p style={{ color: '#888888' }}>
+                Copy and paste a single line of code. The widget appears instantly on your site. No complex configuration needed.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <BarChart3 className="w-6 h-6" style={{ color: '#00ff88' }} />
+              </div>
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                NPS + Feedback Types
+              </h3>
+              <p style={{ color: '#888888' }}>
+                Collect NPS scores, feature requests, bug reports, and general feedback. All organized in your dashboard.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <Zap className="w-6 h-6" style={{ color: '#00ff88' }} />
+              </div>
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                Real-Time Dashboard
+              </h3>
+              <p style={{ color: '#888888' }}>
+                See feedback as it comes in. Filter by type, status, or date. Track NPS trends over time.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <Shield className="w-6 h-6" style={{ color: '#00ff88' }} />
+              </div>
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                Privacy First
+              </h3>
+              <p style={{ color: '#888888' }}>
+                No tracking, no cookies, no nonsense. Just pure feedback collection. Your users' data stays private.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <Users className="w-6 h-6" style={{ color: '#00ff88' }} />
+              </div>
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                Team Collaboration
+              </h3>
+              <p style={{ color: '#888888' }}>
+                Invite team members, assign feedback, add internal notes. Work together to improve your product.
+              </p>
+            </div>
+
+            {/* Feature 6 */}
+            <div 
+              className="p-8 space-y-4"
+              style={{ 
+                backgroundColor: '#0a0a0a', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div 
+                className="w-12 h-12 flex items-center justify-center"
+                style={{ backgroundColor: '#00ff8820' }}
+              >
+                <CheckCircle2 className="w-6 h-6" style={{ color: '#00ff88' }} />
+              </div>
+              <h3 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
+                Status Workflow
+              </h3>
+              <p style={{ color: '#888888' }}>
+                Track feedback from 'New' to 'In Analysis' to 'Implemented'. Never lose track of user requests.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Simple, Transparent{' '}
-              <span className="text-[#00ff88]">Pricing</span>
+      <section className="px-6 py-24" style={{ backgroundColor: '#0a0a0a' }}>
+        <div className="max-w-4xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#ffffff' }}>
+              Simple, Transparent Pricing
             </h2>
-            <p className="text-[#888888]">
-              Start free, scale as you grow. No hidden fees, no surprises.
+            <p className="text-lg" style={{ color: '#888888' }}>
+              Start free. Scale when you need to. No surprises.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {[
-              {
-                name: 'Starter',
-                price: 'Free',
-                description: 'Perfect for side projects',
-                features: [
-                  'Up to 100 feedback/month',
-                  'Basic analytics',
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            {/* Free Plan */}
+            <div 
+              className="p-8 space-y-6"
+              style={{ 
+                backgroundColor: '#000000', 
+                border: '1px solid #222222' 
+              }}
+            >
+              <div>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: '#ffffff' }}>
+                  Starter
+                </h3>
+                <p className="text-sm" style={{ color: '#666666' }}>
+                  Perfect for side projects
+                </p>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold" style={{ color: '#ffffff' }}>$0</span>
+                <span style={{ color: '#666666' }}>/month</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Up to 100 feedbacks/month',
+                  'NPS collection',
+                  'Basic dashboard',
                   'Email notifications',
-                  '1 project',
-                  'Community support',
-                ],
-                cta: 'Get Started',
-                popular: false,
-              },
-              {
-                name: 'Pro',
-                price: '$29',
-                period: '/month',
-                description: 'For growing SaaS products',
-                features: [
-                  'Unlimited feedback',
-                  'Advanced analytics',
-                  'Slack integration',
-                  '10 projects',
+                  '1 team member',
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-sm" style={{ color: '#888888' }}>
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#00ff88' }} />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full py-3 text-center font-medium transition-colors"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#ffffff',
+                  border: '1px solid #333333',
+                }}
+              >
+                Get Started Free
+              </Link>
+            </div>
+
+            {/* Pro Plan */}
+            <div 
+              className="p-8 space-y-6 relative"
+              style={{ 
+                backgroundColor: '#000000', 
+                border: '2px solid #00ff88' 
+              }}
+            >
+              <div 
+                className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-medium"
+                style={{ 
+                  backgroundColor: '#00ff88', 
+                  color: '#000000' 
+                }}
+              >
+                MOST POPULAR
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: '#ffffff' }}>
+                  Pro
+                </h3>
+                <p className="text-sm" style={{ color: '#666666' }}>
+                  For growing SaaS businesses
+                </p>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold" style={{ color: '#ffffff' }}>$15</span>
+                <span style={{ color: '#666666' }}>/month</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Unlimited feedbacks',
+                  'Everything in Starter',
+                  'Unlimited team members',
                   'Priority support',
                   'Custom branding',
+                  'Advanced analytics',
                   'API access',
-                ],
-                cta: 'Start Free Trial',
-                popular: true,
-              },
-              {
-                name: 'Enterprise',
-                price: 'Custom',
-                description: 'For large organizations',
-                features: [
-                  'Everything in Pro',
-                  'Unlimited projects',
-                  'SSO & SAML',
-                  'Custom contracts',
-                  'Dedicated support',
-                  'SLA guarantee',
-                  'On-premise option',
-                ],
-                cta: 'Contact Sales',
-                popular: false,
-              },
-            ].map((plan, index) => (
-              <div 
-                key={index}
-                className={`p-6 border ${
-                  plan.popular 
-                    ? 'border-[#00ff88] bg-[#00ff88]/5' 
-                    : 'border-[#222222] bg-[#0a0a0a]'
-                }`}
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-sm" style={{ color: '#888888' }}>
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#00ff88' }} />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className="block w-full py-3 text-center font-medium transition-colors"
+                style={{
+                  backgroundColor: '#00ff88',
+                  color: '#000000',
+                }}
               >
-                {plan.popular && (
-                  <div className="inline-block px-3 py-1 mb-4 text-xs font-medium bg-[#00ff88] text-black">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="text-xl font-semibold text-white mb-2">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-3xl font-bold text-white">{plan.price}</span>
-                  {plan.period && <span className="text-[#888888]">{plan.period}</span>}
-                </div>
-                <p className="text-[#888888] text-sm mb-6">{plan.description}</p>
-                <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, fIndex) => (
-                    <li key={fIndex} className="flex items-center gap-2 text-sm text-[#888888]">
-                      <Check className="w-4 h-4 text-[#00ff88] flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href={plan.name === 'Enterprise' ? '/upgrade' : '/signup'}
-                  className={`block w-full py-2 text-center font-medium transition-colors ${
-                    plan.popular
-                      ? 'bg-[#00ff88] text-black hover:bg-[#00ffaa]'
-                      : 'border border-[#00ff88] text-[#00ff88] hover:bg-[#00ff88]/10'
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
+                Start Free Trial
+              </Link>
+            </div>
           </div>
+
+          <p className="text-center text-sm" style={{ color: '#666666' }}>
+            Compare with Canny ($50+/mo) or Featurebase ($40+/mo). We built TinyFeedback because we were tired of overpaying.
+          </p>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-[#222222]">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Ready to Start Collecting{' '}
-            <span className="text-[#00ff88]">Better Feedback?</span>
+      <section className="px-6 py-24">
+        <div className="max-w-4xl mx-auto text-center space-y-8">
+          <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#ffffff' }}>
+            Ready to Understand Your Users?
           </h2>
-          <p className="text-[#888888] mb-8 max-w-2xl mx-auto">
-            Join thousands of teams using TinyFeedback to build products their users love.
-            Start your free trial today.
+          <p className="text-lg" style={{ color: '#888888' }}>
+            Join hundreds of indie hackers who use TinyFeedback to build better products.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
               href="/signup"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-[#00ff88] text-black font-medium hover:bg-[#00ffaa] transition-colors"
+              className="px-8 py-4 text-lg font-medium transition-colors flex items-center gap-2"
+              style={{
+                backgroundColor: '#00ff88',
+                color: '#000000',
+              }}
             >
-              Start Free Trial
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link 
-              href="/demo"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 border border-[#00ff88] text-[#00ff88] font-medium hover:bg-[#00ff88]/10 transition-colors"
-            >
-              View Demo
+              Get Started Free
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
+          <p className="text-sm" style={{ color: '#666666' }}>
+            Free forever for up to 100 feedbacks/month. No credit card required.
+          </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-[#222222]">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-[#00ff88]" />
-                <span className="text-lg font-bold text-white">TinyFeedback</span>
-              </div>
-              <p className="text-sm text-[#888888]">
-                The modern feedback platform for SaaS products.
-              </p>
+      <footer className="px-6 py-12 border-t" style={{ borderColor: '#111111' }}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" style={{ color: '#00ff88' }} />
+              <span className="font-semibold" style={{ color: '#ffffff' }}>
+                TinyFeedback
+              </span>
             </div>
-            <div>
-              <h4 className="text-white font-medium mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-[#888888]">
-                <li><a href="#features" className="hover:text-[#00ff88]">Features</a></li>
-                <li><a href="#pricing" className="hover:text-[#00ff88]">Pricing</a></li>
-                <li><a href="/demo" className="hover:text-[#00ff88]">Demo</a></li>
-              </ul>
+            <p className="text-sm" style={{ color: '#666666' }}>
+              © 2025 TinyFeedback. Built with 💚 for indie hackers.
+            </p>
+            <div className="flex items-center gap-6">
+              <Link 
+                href="/demo" 
+                className="text-sm transition-colors hover:text-white"
+                style={{ color: '#666666' }}
+              >
+                Demo
+              </Link>
+              <Link 
+                href="/login" 
+                className="text-sm transition-colors hover:text-white"
+                style={{ color: '#666666' }}
+              >
+                Login
+              </Link>
+              <Link 
+                href="/signup" 
+                className="text-sm transition-colors hover:text-white"
+                style={{ color: '#666666' }}
+              >
+                Sign Up
+              </Link>
             </div>
-            <div>
-              <h4 className="text-white font-medium mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-[#888888]">
-                <li><a href="#" className="hover:text-[#00ff88]">About</a></li>
-                <li><a href="#" className="hover:text-[#00ff88]">Blog</a></li>
-                <li><a href="#" className="hover:text-[#00ff88]">Careers</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-medium mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-[#888888]">
-                <li><a href="#" className="hover:text-[#00ff88]">Privacy</a></li>
-                <li><a href="#" className="hover:text-[#00ff88]">Terms</a></li>
-                <li><a href="#" className="hover:text-[#00ff88]">Security</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-[#222222] text-center text-sm text-[#888888]">
-            © {new Date().getFullYear()} TinyFeedback. All rights reserved.
           </div>
         </div>
       </footer>
