@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import type { Project, Feedback } from '@/types';
 import { FeedbackCard } from '@/components/feedback/FeedbackCard';
-import { FeedbackFilterPanel, FeedbackFilters, defaultFilters } from '@/components/feedback/FeedbackFilterPanel';
 import { FeedbackDetail } from '@/components/feedback/FeedbackDetail';
+import { FeedbackFilterPanel, FeedbackFilters, defaultFilters } from '@/components/feedback/FeedbackFilterPanel';
 
 interface PaginationInfo {
   page: number;
@@ -36,6 +36,7 @@ export default function FeedbacksPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FeedbackFilters>(defaultFilters);
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     limit: 20,
@@ -43,9 +44,6 @@ export default function FeedbacksPage() {
     totalPages: 0,
     hasMore: false,
   });
-  
-  // State for the detail modal
-  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
 
   // Load user and project
   useEffect(() => {
