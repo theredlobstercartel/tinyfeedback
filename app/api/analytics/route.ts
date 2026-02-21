@@ -19,6 +19,10 @@ export interface AnalyticsData {
     date: string;
     count: number;
   }[];
+  volumeData: {
+    date: string;
+    count: number;
+  }[];
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -54,6 +58,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const last7DaysStart = new Date(today);
     last7DaysStart.setUTCDate(today.getUTCDate() - 6);
     const last7DaysStartIso = last7DaysStart.toISOString();
+
+    // Get last 30 days for volume chart
+    const last30DaysStart = new Date(today);
+    last30DaysStart.setUTCDate(today.getUTCDate() - 29);
+    const last30DaysStartIso = last30DaysStart.toISOString();
 
     // Query 1: Total feedbacks
     const { count: totalFeedbacks, error: totalError } = await supabase
@@ -175,6 +184,40 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    // Query 7: Volume data (last 30 days)
+    const { data: volumeDataRaw, error: volumeError } = await supabase
+      .from('feedbacks')
+      .select('created_at')
+      .eq('project_id', projectId)
+      .gte('created_at', last30DaysStartIso)
+      .order('created_at', { ascending: true });
+
+    if (volumeError) {
+      console.error('Error fetching volume data:', volumeError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Process volume data into daily counts
+    const volumeMap = new Map<string, number>();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setUTCDate(today.getUTCDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      volumeMap.set(dateKey, 0);
+    }
+
+    volumeDataRaw?.forEach(feedback => {
+      const dateKey = feedback.created_at.split('T')[0];
+      volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + 1);
+    });
+
+    const volumeData = Array.from(volumeMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     const analyticsData: AnalyticsData = {
       totalFeedbacks: totalFeedbacks || 0,
       averageNps,
@@ -187,6 +230,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         detractors,
       },
       recentTrend,
+      volumeData,
     };
 
     return NextResponse.json(analyticsData);
