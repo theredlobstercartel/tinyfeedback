@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { LogOut, Loader2, Sparkles } from 'lucide-react';
+import { LogOut, Loader2, Sparkles, MessageSquare } from 'lucide-react';
 import type { Project } from '@/types';
 
 export default function DashboardPage() {
@@ -204,8 +204,9 @@ export default function DashboardPage() {
             Ações Rápidas
           </h3>
           <div className="flex flex-wrap gap-4">
-            <button
-              className="px-6 py-3 font-medium transition-colors"
+            <a
+              href="/dashboard/feedbacks"
+              className="px-6 py-3 font-medium transition-colors inline-flex items-center gap-2"
               style={{
                 backgroundColor: '#00ff88',
                 color: '#000000',
@@ -215,6 +216,24 @@ export default function DashboardPage() {
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = '#00ff88';
+              }}
+            >
+              <MessageSquare size={18} />
+              Ver Feedbacks
+            </a>
+
+            <button
+              className="px-6 py-3 font-medium transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#00ff88',
+                border: '1px solid #00ff88',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 255, 136, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
               Criar Projeto
