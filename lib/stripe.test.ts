@@ -45,7 +45,7 @@ describe('Stripe Library', () => {
   describe('verifyWebhookSignature', () => {
     it('should verify webhook signature successfully', () => {
       const mockEvent = { id: 'evt_123', type: 'payment_intent.succeeded' };
-      const mockStripe = new Stripe('test_key', { apiVersion: '2025-01-27.acacia' });
+      const mockStripe = new Stripe('test_key', { apiVersion: '2026-01-28.clover' });
       
       vi.mocked(mockStripe.webhooks.constructEvent).mockReturnValue(mockEvent as any);
       
@@ -55,7 +55,7 @@ describe('Stripe Library', () => {
     });
 
     it('should throw error for invalid signature', () => {
-      const mockStripe = new Stripe('test_key', { apiVersion: '2025-01-27.acacia' });
+      const mockStripe = new Stripe('test_key', { apiVersion: '2026-01-28.clover' });
       
       vi.mocked(mockStripe.webhooks.constructEvent).mockImplementation(() => {
         throw new Error('Invalid signature');

@@ -17,7 +17,7 @@ function getStripe(): Stripe {
       throw new Error('STRIPE_SECRET_KEY not set');
     }
     stripeInstance = new Stripe(secretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2026-01-28.clover',
     });
   }
   return stripeInstance;
@@ -41,7 +41,7 @@ export function verifyWebhookSignature(
       payload,
       signature,
       webhookSecret
-    ) as StripeWebhookEvent;
+    ) as unknown as StripeWebhookEvent;
     return event;
   } catch (error) {
     throw new Error(`Webhook signature verification failed: ${(error as Error).message}`);
@@ -195,7 +195,7 @@ export async function processWebhookEvent(
   
   switch (type) {
     case 'payment_intent.succeeded': {
-      const paymentIntent = data.object as PaymentIntent;
+      const paymentIntent = data.object as unknown as PaymentIntent;
       const customerId = paymentIntent.customer;
       
       if (!customerId) {
@@ -213,7 +213,7 @@ export async function processWebhookEvent(
     }
     
     case 'payment_intent.payment_failed': {
-      const paymentIntent = data.object as PaymentIntent;
+      const paymentIntent = data.object as unknown as PaymentIntent;
       const customerId = paymentIntent.customer;
       
       if (!customerId) {
@@ -227,7 +227,7 @@ export async function processWebhookEvent(
     }
     
     case 'customer.subscription.deleted': {
-      const subscription = data.object as Subscription;
+      const subscription = data.object as unknown as Subscription;
       const customerId = subscription.customer;
       
       const project = await findProjectByStripeCustomerId(customerId);
@@ -268,7 +268,7 @@ export async function processWebhookEvent(
     }
     
     case 'customer.subscription.updated': {
-      const subscription = data.object as Subscription;
+      const subscription = data.object as unknown as Subscription;
       const customerId = subscription.customer;
       
       const project = await findProjectByStripeCustomerId(customerId);
