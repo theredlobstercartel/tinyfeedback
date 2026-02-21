@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Define protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/settings', '/projects'];
+  const protectedRoutes = ['/dashboard', '/settings', '/projects', '/onboarding'];
   const isProtectedRoute = protectedRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
@@ -49,7 +49,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirect authenticated users away from login/auth pages
-  if ((request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/auth/callback') && user) {
+  if ((request.nextUrl.pathname === '/login') && user) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

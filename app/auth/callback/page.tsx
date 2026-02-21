@@ -23,8 +23,26 @@ export default function AuthCallbackPage() {
         }
 
         if (session) {
-          // User is authenticated, redirect to dashboard
-          router.push('/dashboard');
+          // Check if user has any projects
+          const { data: projects, error: projectsError } = await supabase
+            .from('projects')
+            .select('id')
+            .limit(1);
+
+          if (projectsError) {
+            console.error('Error checking projects:', projectsError);
+            // If there's an error checking projects, redirect to dashboard anyway
+            router.push('/dashboard');
+            router.refresh();
+            return;
+          }
+
+          // If user has no projects, redirect to onboarding
+          if (!projects || projects.length === 0) {
+            router.push('/onboarding');
+          } else {
+            router.push('/dashboard');
+          }
           router.refresh();
         } else {
           // Check if there's an error in the URL hash
