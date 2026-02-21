@@ -1,0 +1,200 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+export interface AnalyticsData {
+  totalFeedbacks: number;
+  averageNps: number | null;
+  feedbacksToday: number;
+  feedbacksThisWeek: number;
+  feedbacksThisMonth: number;
+  npsDistribution: {
+    promoters: number;
+    passives: number;
+    detractors: number;
+  };
+  recentTrend: {
+    date: string;
+    count: number;
+  }[];
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('project_id');
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: 'Project ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Create admin client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get today's date at midnight UTC
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayIso = today.toISOString();
+
+    // Get start of week (Sunday)
+    const weekStart = new Date(today);
+    weekStart.setUTCDate(today.getUTCDate() - today.getUTCDay());
+    const weekStartIso = weekStart.toISOString();
+
+    // Get start of month
+    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const monthStartIso = monthStart.toISOString();
+
+    // Get last 7 days for trend
+    const last7DaysStart = new Date(today);
+    last7DaysStart.setUTCDate(today.getUTCDate() - 6);
+    const last7DaysStartIso = last7DaysStart.toISOString();
+
+    // Query 1: Total feedbacks
+    const { count: totalFeedbacks, error: totalError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId);
+
+    if (totalError) {
+      console.error('Error fetching total feedbacks:', totalError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Query 2: Average NPS (only for NPS type feedbacks with scores)
+    const { data: npsData, error: npsError } = await supabase
+      .from('feedbacks')
+      .select('nps_score')
+      .eq('project_id', projectId)
+      .eq('type', 'nps')
+      .not('nps_score', 'is', null);
+
+    if (npsError) {
+      console.error('Error fetching NPS data:', npsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Calculate average NPS
+    const npsScores = npsData?.map(f => f.nps_score).filter((s): s is number => s !== null) || [];
+    const averageNps = npsScores.length > 0 
+      ? Math.round((npsScores.reduce((a, b) => a + b, 0) / npsScores.length) * 10) / 10
+      : null;
+
+    // Calculate NPS distribution
+    const promoters = npsScores.filter(s => s >= 9).length;
+    const passives = npsScores.filter(s => s >= 7 && s <= 8).length;
+    const detractors = npsScores.filter(s => s <= 6).length;
+
+    // Query 3: Feedbacks today
+    const { count: feedbacksToday, error: todayError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .gte('created_at', todayIso);
+
+    if (todayError) {
+      console.error('Error fetching today feedbacks:', todayError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Query 4: Feedbacks this week
+    const { count: feedbacksThisWeek, error: weekError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .gte('created_at', weekStartIso);
+
+    if (weekError) {
+      console.error('Error fetching week feedbacks:', weekError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Query 5: Feedbacks this month
+    const { count: feedbacksThisMonth, error: monthError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .gte('created_at', monthStartIso);
+
+    if (monthError) {
+      console.error('Error fetching month feedbacks:', monthError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Query 6: Recent trend (last 7 days)
+    const { data: trendData, error: trendError } = await supabase
+      .from('feedbacks')
+      .select('created_at')
+      .eq('project_id', projectId)
+      .gte('created_at', last7DaysStartIso)
+      .order('created_at', { ascending: true });
+
+    if (trendError) {
+      console.error('Error fetching trend data:', trendError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Process trend data into daily counts
+    const trendMap = new Map<string, number>();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setUTCDate(today.getUTCDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      trendMap.set(dateKey, 0);
+    }
+
+    trendData?.forEach(feedback => {
+      const dateKey = feedback.created_at.split('T')[0];
+      trendMap.set(dateKey, (trendMap.get(dateKey) || 0) + 1);
+    });
+
+    const recentTrend = Array.from(trendMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const analyticsData: AnalyticsData = {
+      totalFeedbacks: totalFeedbacks || 0,
+      averageNps,
+      feedbacksToday: feedbacksToday || 0,
+      feedbacksThisWeek: feedbacksThisWeek || 0,
+      feedbacksThisMonth: feedbacksThisMonth || 0,
+      npsDistribution: {
+        promoters,
+        passives,
+        detractors,
+      },
+      recentTrend,
+    };
+
+    return NextResponse.json(analyticsData);
+  } catch (error) {
+    console.error('Error in GET /api/analytics:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

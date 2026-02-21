@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { LogOut, Loader2, Sparkles, MessageSquare } from 'lucide-react';
+import { LogOut, Loader2, Sparkles, MessageSquare, BarChart3 } from 'lucide-react';
 import { FeedbackCounter } from '@/components/FeedbackCounter';
 import type { Project } from '@/types';
 
@@ -211,6 +211,25 @@ export default function DashboardPage() {
             >
               <MessageSquare size={18} />
               Ver Feedbacks
+            </a>
+
+            <a
+              href="/dashboard/analytics"
+              className="px-6 py-3 font-medium transition-colors inline-flex items-center gap-2"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#00d4ff',
+                border: '1px solid #00d4ff',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 212, 255, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <BarChart3 size={18} />
+              Analytics
             </a>
 
             <button
