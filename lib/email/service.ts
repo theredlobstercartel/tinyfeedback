@@ -6,6 +6,11 @@ import {
   NewFeedbackEmailData,
 } from './new-feedback-template';
 import {
+  generateResponseEmailHTML,
+  generateResponseEmailText,
+  ResponseEmailData,
+} from './response-template';
+import {
   generateSummaryEmailHTML,
   generateSummaryEmailText,
 } from './summary-template';
@@ -127,6 +132,32 @@ export async function sendWeeklySummaryEmail(
     subject,
     html,
     text,
+  });
+}
+
+/**
+ * Send response email to user
+ */
+export async function sendResponseEmail(
+  to: string,
+  data: ResponseEmailData
+): Promise<{
+  success: boolean;
+  error?: string;
+  data?: { id: string };
+}> {
+  const { projectName } = data;
+
+  const subject = `📧 Resposta ao seu Feedback - ${projectName}`;
+  const html = generateResponseEmailHTML(data);
+  const text = generateResponseEmailText(data);
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    from: `${data.projectName} <onotificacoes@tinyfeedback.app>`,
   });
 }
 

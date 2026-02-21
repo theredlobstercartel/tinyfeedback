@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { UpdateFeedbackInput } from '@/types';
+import { sendResponseEmail } from '@/lib/email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -53,8 +54,44 @@ export async function PATCH(
       );
     }
 
+    if (body.response_sent !== undefined && typeof body.response_sent !== 'boolean') {
+      return NextResponse.json(
+        { error: 'response_sent must be a boolean' },
+        { status: 400 }
+      );
+    }
+
     // Create admin client to bypass RLS for service operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get current feedback to check for changes
+    const { data: currentFeedback, error: fetchError } = await supabase
+      .from('feedbacks')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('Supabase fetch error:', fetchError);
+      return NextResponse.json(
+        { error: 'Feedback not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch project name separately
+    let projectName = 'Projeto';
+    if (currentFeedback.project_id) {
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('name')
+        .eq('id', currentFeedback.project_id)
+        .single();
+      
+      if (projectData) {
+        projectName = projectData.name;
+      }
+    }
 
     const { data, error } = await supabase
       .from('feedbacks')
@@ -72,6 +109,29 @@ export async function PATCH(
         { error: 'Failed to update feedback' },
         { status: 500 }
       );
+    }
+
+    // Send email if response was just marked as sent and there's content and email
+    const shouldSendEmail = 
+      body.response_sent === true &&
+      body.response_content &&
+      currentFeedback.user_email &&
+      !currentFeedback.response_sent; // Only send if it wasn't already responded
+
+    if (shouldSendEmail && body.response_content) {
+      try {
+        await sendResponseEmail(
+          currentFeedback.user_email,
+          {
+            projectName,
+            feedback: currentFeedback,
+            responseContent: body.response_content,
+          }
+        );
+      } catch (emailError) {
+        console.error('Error sending response email:', emailError);
+        // Don't fail the request if email fails, just log it
+      }
     }
 
     return NextResponse.json({ data });
