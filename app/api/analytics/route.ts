@@ -15,6 +15,11 @@ export interface AnalyticsData {
     passives: number;
     detractors: number;
   };
+  typeDistribution: {
+    nps: number;
+    suggestion: number;
+    bug: number;
+  };
   recentTrend: {
     date: string;
     count: number;
@@ -104,6 +109,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const promoters = npsScores.filter(s => s >= 9).length;
     const passives = npsScores.filter(s => s >= 7 && s <= 8).length;
     const detractors = npsScores.filter(s => s <= 6).length;
+
+    // Query 3: Type distribution (NPS, Suggestion, Bug)
+    const { data: typeData, error: typeError } = await supabase
+      .from('feedbacks')
+      .select('type')
+      .eq('project_id', projectId);
+
+    if (typeError) {
+      console.error('Error fetching type distribution:', typeError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Calculate type distribution
+    const typeDistribution = {
+      nps: typeData?.filter(f => f.type === 'nps').length || 0,
+      suggestion: typeData?.filter(f => f.type === 'suggestion').length || 0,
+      bug: typeData?.filter(f => f.type === 'bug').length || 0,
+    };
 
     // Query 3: Feedbacks today
     const { count: feedbacksToday, error: todayError } = await supabase
@@ -229,6 +255,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         passives,
         detractors,
       },
+      typeDistribution,
       recentTrend,
       volumeData,
     };

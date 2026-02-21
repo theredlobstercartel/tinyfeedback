@@ -15,7 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import type { Project } from '@/types';
-import { StatCard, NpsGauge, TrendChart, VolumeChart } from '@/components/analytics';
+import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution } from '@/components/analytics';
 
 interface AnalyticsData {
   totalFeedbacks: number;
@@ -27,6 +27,11 @@ interface AnalyticsData {
     promoters: number;
     passives: number;
     detractors: number;
+  };
+  typeDistribution: {
+    nps: number;
+    suggestion: number;
+    bug: number;
   };
   recentTrend: {
     date: string;
@@ -259,7 +264,12 @@ export default function AnalyticsPage() {
               {/* NPS Gauge */}
               <NpsGauge score={analytics.averageNps} />
 
-              {/* Trend Chart */}
+              {/* Type Distribution */}
+              <TypeDistribution distribution={analytics.typeDistribution} />
+            </div>
+
+            {/* Trend Chart */}
+            <div className="grid grid-cols-1 gap-6">
               <TrendChart data={analytics.recentTrend} />
             </div>
 
