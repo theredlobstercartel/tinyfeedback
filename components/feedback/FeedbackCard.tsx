@@ -2,6 +2,7 @@
 
 import { MessageSquare, Bug, Star, Calendar, Mail, ExternalLink } from 'lucide-react';
 import { Feedback } from '@/types';
+import { statusConfig } from './StatusDropdown';
 
 interface FeedbackCardProps {
   feedback: Feedback;
@@ -26,29 +27,6 @@ const typeConfig = {
     label: 'Bug',
     color: '#ff4444',
     bgColor: 'rgba(255, 68, 68, 0.1)',
-  },
-};
-
-const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  new: {
-    label: 'Novo',
-    color: '#00d4ff',
-    bgColor: 'rgba(0, 212, 255, 0.15)',
-  },
-  read: {
-    label: 'Lido',
-    color: '#888888',
-    bgColor: 'rgba(136, 136, 136, 0.15)',
-  },
-  responded: {
-    label: 'Respondido',
-    color: '#00ff88',
-    bgColor: 'rgba(0, 255, 136, 0.15)',
-  },
-  archived: {
-    label: 'Arquivado',
-    color: '#666666',
-    bgColor: 'rgba(102, 102, 102, 0.15)',
   },
 };
 

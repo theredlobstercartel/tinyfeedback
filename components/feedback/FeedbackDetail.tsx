@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { Feedback } from '@/types';
-import { Save, X, FileText, Image, Globe, Monitor, Mail, Calendar, Bug, MessageSquare, Star } from 'lucide-react';
+import { Save, X, FileText, Image, Globe, Monitor, Mail, Calendar, Bug, MessageSquare, Star, Loader2 } from 'lucide-react';
+import { StatusDropdown, FeedbackStatus } from './StatusDropdown';
 
 interface FeedbackDetailProps {
   feedback: Feedback;
@@ -16,6 +17,10 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [imageError, setImageError] = useState(false);
+  
+  // Status update state
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const handleSaveNotes = useCallback(async () => {
     setIsSaving(true);
@@ -52,35 +57,37 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
     }
   }, [feedback.id, internalNotes, onUpdate]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new':
-        return '#00d4ff';
-      case 'read':
-        return '#ffd700';
-      case 'responded':
-        return '#00ff88';
-      case 'archived':
-        return '#666666';
-      default:
-        return '#888888';
-    }
-  };
+  // Handle status change from dropdown
+  const handleStatusChange = useCallback(async (newStatus: FeedbackStatus) => {
+    setIsUpdatingStatus(true);
+    setStatusError(null);
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'new':
-        return 'Novo';
-      case 'read':
-        return 'Lido';
-      case 'responded':
-        return 'Respondido';
-      case 'archived':
-        return 'Arquivado';
-      default:
-        return status;
+    try {
+      const response = await fetch(`/api/feedbacks/${feedback.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update status');
+      }
+
+      const { data } = await response.json();
+      onUpdate?.(data);
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : 'Failed to update status');
+      // Clear error after 3 seconds
+      setTimeout(() => setStatusError(null), 3000);
+    } finally {
+      setIsUpdatingStatus(false);
     }
-  };
+  }, [feedback.id, onUpdate]);
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -156,17 +163,22 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
               {typeConfig.label}
             </div>
 
-            {/* Status Badge */}
-            <span
-              className="px-3 py-1.5 text-xs font-mono uppercase"
-              style={{
-                backgroundColor: `${getStatusColor(feedback.status)}20`,
-                color: getStatusColor(feedback.status),
-                border: `1px solid ${getStatusColor(feedback.status)}`,
-              }}
-            >
-              {getStatusLabel(feedback.status)}
-            </span>
+            {/* Status Dropdown */}
+            <div className="flex items-center gap-2">
+              <StatusDropdown
+                currentStatus={feedback.status}
+                onStatusChange={handleStatusChange}
+                disabled={isUpdatingStatus}
+              />
+              {isUpdatingStatus && (
+                <Loader2 size={16} className="animate-spin" style={{ color: '#00ff88' }} />
+              )}
+            </div>
+            {statusError && (
+              <span style={{ color: '#ff4444', fontSize: '0.75rem' }}>
+                {statusError}
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}

@@ -5,6 +5,9 @@ import { UpdateFeedbackInput } from '@/types';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Valid status values for the new workflow
+const VALID_STATUSES = ['new', 'in_analysis', 'implemented', 'read', 'responded', 'archived'];
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,11 +24,19 @@ export async function PATCH(
       );
     }
 
-    if (body.status !== undefined && typeof body.status !== 'string') {
-      return NextResponse.json(
-        { error: 'status must be a string' },
-        { status: 400 }
-      );
+    if (body.status !== undefined) {
+      if (typeof body.status !== 'string') {
+        return NextResponse.json(
+          { error: 'status must be a string' },
+          { status: 400 }
+        );
+      }
+      if (!VALID_STATUSES.includes(body.status)) {
+        return NextResponse.json(
+          { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+          { status: 400 }
+        );
+      }
     }
 
     if (body.response_content !== undefined && typeof body.response_content !== 'string') {
