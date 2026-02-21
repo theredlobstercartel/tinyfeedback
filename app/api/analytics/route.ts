@@ -28,6 +28,14 @@ export interface AnalyticsData {
     date: string;
     count: number;
   }[];
+  npsOverTime: {
+    date: string;
+    npsScore: number | null;
+    promoters: number;
+    passives: number;
+    detractors: number;
+    totalResponses: number;
+  }[];
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -68,6 +76,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const last30DaysStart = new Date(today);
     last30DaysStart.setUTCDate(today.getUTCDate() - 29);
     const last30DaysStartIso = last30DaysStart.toISOString();
+
+    // Get last 90 days for NPS over time
+    const last90DaysStart = new Date(today);
+    last90DaysStart.setUTCDate(today.getUTCDate() - 89);
+    const last90DaysStartIso = last90DaysStart.toISOString();
 
     // Query 1: Total feedbacks
     const { count: totalFeedbacks, error: totalError } = await supabase
@@ -244,6 +257,68 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    // Query 8: NPS over time (last 90 days)
+    const { data: npsTimeDataRaw, error: npsTimeError } = await supabase
+      .from('feedbacks')
+      .select('created_at, nps_score')
+      .eq('project_id', projectId)
+      .eq('type', 'nps')
+      .not('nps_score', 'is', null)
+      .gte('created_at', last90DaysStartIso)
+      .order('created_at', { ascending: true });
+
+    if (npsTimeError) {
+      console.error('Error fetching NPS time data:', npsTimeError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    // Process NPS data into daily averages
+    const npsTimeMap = new Map<string, { scores: number[]; count: number }>();
+    
+    // Initialize all days in the range
+    for (let i = 0; i < 90; i++) {
+      const d = new Date(today);
+      d.setUTCDate(today.getUTCDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      npsTimeMap.set(dateKey, { scores: [], count: 0 });
+    }
+
+    // Aggregate NPS scores by day
+    npsTimeDataRaw?.forEach(feedback => {
+      const dateKey = feedback.created_at.split('T')[0];
+      const entry = npsTimeMap.get(dateKey);
+      if (entry && feedback.nps_score !== null) {
+        entry.scores.push(feedback.nps_score);
+        entry.count++;
+      }
+    });
+
+    // Calculate daily averages and format data
+    const npsOverTime = Array.from(npsTimeMap.entries())
+      .map(([date, data]) => {
+        const npsScore = data.scores.length > 0 
+          ? Math.round((data.scores.reduce((a, b) => a + b, 0) / data.scores.length) * 10) / 10
+          : null;
+        
+        // Calculate promoters, passives, detractors
+        const dayPromoters = data.scores.filter(s => s >= 9).length;
+        const dayPassives = data.scores.filter(s => s >= 7 && s <= 8).length;
+        const dayDetractors = data.scores.filter(s => s <= 6).length;
+        
+        return {
+          date,
+          npsScore,
+          promoters: dayPromoters,
+          passives: dayPassives,
+          detractors: dayDetractors,
+          totalResponses: data.count,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     const analyticsData: AnalyticsData = {
       totalFeedbacks: totalFeedbacks || 0,
       averageNps,
@@ -258,6 +333,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       typeDistribution,
       recentTrend,
       volumeData,
+      npsOverTime,
     };
 
     return NextResponse.json(analyticsData);
