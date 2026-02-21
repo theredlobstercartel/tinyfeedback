@@ -15,7 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import type { Project } from '@/types';
-import { StatCard, NpsGauge, TrendChart } from '@/components/analytics';
+import { StatCard, NpsGauge, TrendChart, VolumeChart } from '@/components/analytics';
 
 interface AnalyticsData {
   totalFeedbacks: number;
@@ -29,6 +29,10 @@ interface AnalyticsData {
     detractors: number;
   };
   recentTrend: {
+    date: string;
+    count: number;
+  }[];
+  volumeData: {
     date: string;
     count: number;
   }[];
@@ -258,6 +262,9 @@ export default function AnalyticsPage() {
               {/* Trend Chart */}
               <TrendChart data={analytics.recentTrend} />
             </div>
+
+            {/* Volume Chart - Full Width */}
+            <VolumeChart data={analytics.volumeData} />
 
             {/* Additional Metrics */}
             <div 
