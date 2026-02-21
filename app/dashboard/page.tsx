@@ -3,21 +3,33 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, Sparkles } from 'lucide-react';
+import type { Project } from '@/types';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const getUser = async () => {
+    const loadData = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      if (user) {
+        const { data: project } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        setProject(project);
+      }
+      
       setIsLoading(false);
     };
 
-    getUser();
+    loadData();
   }, []);
 
   const handleLogout = async () => {
@@ -25,6 +37,8 @@ export default function DashboardPage() {
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
+
+  const isPro = project?.plan === 'pro' && project?.subscription_status === 'active';
 
   if (isLoading) {
     return (
@@ -62,9 +76,25 @@ export default function DashboardPage() {
               <p style={{ color: '#ffffff' }}>
                 {user?.email}
               </p>
-              <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                Founder
-              </p>
+              <div className="flex items-center gap-2 justify-end">
+                {isPro ? (
+                  <span 
+                    className="flex items-center gap-1 text-xs font-medium px-2 py-0.5"
+                    style={{ 
+                      color: '#00ff88', 
+                      border: '1px solid #00ff88',
+                      backgroundColor: 'rgba(0, 255, 136, 0.1)'
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    PRO
+                  </span>
+                ) : (
+                  <span style={{ color: '#888888', fontSize: '0.875rem' }}>
+                    Free
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={handleLogout}
@@ -189,6 +219,28 @@ export default function DashboardPage() {
             >
               Criar Projeto
             </button>
+            
+            {!isPro && (
+              <a
+                href="/billing"
+                className="px-6 py-3 font-medium transition-colors inline-flex items-center gap-2"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#ffd700',
+                  border: '1px solid #ffd700',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 215, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Sparkles size={16} />
+                Upgrade para Pro
+              </a>
+            )}
+            
             <button
               className="px-6 py-3 font-medium transition-colors"
               style={{
@@ -224,6 +276,26 @@ export default function DashboardPage() {
             >
               Configurações
             </a>
+            {!isPro && (
+              <a
+                href="/upgrade"
+                className="px-6 py-3 font-medium transition-colors inline-flex items-center gap-2"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#ffd700',
+                  border: '1px solid #ffd700',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 215, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Sparkles size={18} />
+                Upgrade Pro
+              </a>
+            )}
           </div>
         </section>
 
