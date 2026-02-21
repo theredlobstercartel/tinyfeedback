@@ -5,12 +5,15 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { LogOut, Loader2, Sparkles, MessageSquare, BarChart3 } from 'lucide-react';
 import { FeedbackCounter } from '@/components/FeedbackCounter';
+import { CreateProjectModal } from '@/components/projects';
 import type { Project } from '@/types';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [projectCount, setProjectCount] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -19,12 +22,16 @@ export default function DashboardPage() {
       setUser(user);
       
       if (user) {
-        const { data: project } = await supabase
+        const { data: projects } = await supabase
           .from('projects')
           .select('*')
           .eq('user_id', user.id)
-          .single();
-        setProject(project);
+          .order('created_at', { ascending: false });
+        
+        if (projects && projects.length > 0) {
+          setProject(projects[0]);
+          setProjectCount(projects.length);
+        }
       }
       
       setIsLoading(false);
@@ -37,6 +44,25 @@ export default function DashboardPage() {
     const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = '/login';
+  };
+
+  const handleProjectCreated = async () => {
+    // Refresh project data after creation
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (projects && projects.length > 0) {
+        setProject(projects[0]);
+        setProjectCount(projects.length);
+      }
+    }
   };
 
   const isPro = project?.plan === 'pro' && project?.subscription_status === 'active';
@@ -152,7 +178,7 @@ export default function DashboardPage() {
               className="text-3xl font-bold"
               style={{ color: '#00ff88' }}
             >
-              0
+              {projectCount}
             </p>
           </div>
 
@@ -233,7 +259,8 @@ export default function DashboardPage() {
             </a>
 
             <button
-              className="px-6 py-3 font-medium transition-colors"
+              onClick={() => setIsModalOpen(true)}
+              className="px-6 py-3 font-medium transition-colors cursor-pointer"
               style={{
                 backgroundColor: 'transparent',
                 color: '#00ff88',
@@ -323,6 +350,13 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* Create Project Modal */}
+      <CreateProjectModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleProjectCreated}
+      />
     </div>
   );
 }
