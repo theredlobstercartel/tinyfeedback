@@ -36,6 +36,11 @@ export async function GET(
           notify_nps: true,
           notify_suggestion: true,
           notify_bug: true,
+          daily_summary_enabled: false,
+          weekly_summary_enabled: false,
+          summary_email: null,
+          last_daily_summary_sent: null,
+          last_weekly_summary_sent: null,
         },
       });
     }
@@ -60,7 +65,7 @@ export async function PATCH(
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Validate input - at least one field should be provided
-    const validFields = ['notify_nps', 'notify_suggestion', 'notify_bug'];
+    const validFields = ['notify_nps', 'notify_suggestion', 'notify_bug', 'daily_summary_enabled', 'weekly_summary_enabled', 'summary_email'];
     const hasValidField = validFields.some(field => field in body);
     
     if (!hasValidField) {
@@ -117,6 +122,9 @@ export async function PATCH(
           notify_nps: body.notify_nps ?? true,
           notify_suggestion: body.notify_suggestion ?? true,
           notify_bug: body.notify_bug ?? true,
+          daily_summary_enabled: body.daily_summary_enabled ?? false,
+          weekly_summary_enabled: body.weekly_summary_enabled ?? false,
+          summary_email: body.summary_email ?? null,
         })
         .select()
         .single();

@@ -1,4 +1,4 @@
-import { DomainManager, NotificationPreferencesManager } from '@/components/settings';
+import { DomainManager, NotificationPreferencesManager, SummarySettingsManager } from '@/components/settings';
 
 // Demo project ID for testing
 const DEMO_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -19,6 +19,11 @@ export default function SettingsPage() {
             Gerencie as configurações do seu projeto
           </p>
         </div>
+
+        {/* Summary Settings - ST-27 */}
+        <SummarySettingsManager 
+          projectId={DEMO_PROJECT_ID}
+        />
 
         {/* Notification Preferences - ST-28 */}
         <NotificationPreferencesManager 
@@ -42,6 +47,10 @@ export default function SettingsPage() {
         >
           <h3 className="mb-3" style={{ color: '#ffffff' }}>Status da Implementação:</h3>
           <ul className="space-y-2 list-disc list-inside">
+            <li style={{ color: '#00ff88' }}>✅ ST-27: Resumo Diário/Semanal - Implementado</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Cron job para envio automático</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- AC-02: Conteúdo com total, média NPS e highlights</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- Email template com design cyber-neon</li>
             <li style={{ color: '#00ff88' }}>✅ ST-28: Preferências de Notificação - Implementado</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Filtro por tipo (NPS, Sugestão, Bug)</li>
             <li style={{ color: '#00ff88' }} className="ml-4">- Tabela notification_preferences criada</li>

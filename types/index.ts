@@ -77,6 +77,12 @@ export interface NotificationPreferences {
   notify_nps: boolean;
   notify_suggestion: boolean;
   notify_bug: boolean;
+  // ST-27: Summary preferences
+  daily_summary_enabled: boolean;
+  weekly_summary_enabled: boolean;
+  summary_email: string | null;
+  last_daily_summary_sent: string | null;
+  last_weekly_summary_sent: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -85,6 +91,10 @@ export interface UpdateNotificationPreferencesInput {
   notify_nps?: boolean;
   notify_suggestion?: boolean;
   notify_bug?: boolean;
+  // ST-27: Summary preferences
+  daily_summary_enabled?: boolean;
+  weekly_summary_enabled?: boolean;
+  summary_email?: string | null;
 }
 
 export interface NotificationTypeConfig {
@@ -92,4 +102,47 @@ export interface NotificationTypeConfig {
   label: string;
   description: string;
   field: 'notify_nps' | 'notify_suggestion' | 'notify_bug';
+}
+
+// Summary Settings Types - ST-27
+export interface SummarySettings {
+  summary_enabled: boolean;
+  summary_frequency: 'daily' | 'weekly';
+  summary_email: string | null;
+  last_summary_sent_at: string | null;
+}
+
+export interface UpdateSummarySettingsInput {
+  summary_enabled?: boolean;
+  summary_frequency?: 'daily' | 'weekly';
+  summary_email?: string | null;
+}
+
+export interface SummaryLog {
+  id: string;
+  project_id: string;
+  summary_type: 'daily' | 'weekly';
+  total_feedbacks: number;
+  avg_nps: number | null;
+  highlights: SummaryHighlight[];
+  sent_at: string;
+  created_at: string;
+}
+
+export interface SummaryHighlight {
+  type: 'nps' | 'suggestion' | 'bug';
+  title: string;
+  content: string;
+  nps_score?: number;
+}
+
+export interface DailySummary {
+  project_name: string;
+  date: string;
+  total_feedbacks: number;
+  avg_nps: number | null;
+  new_nps_count: number;
+  new_suggestions_count: number;
+  new_bugs_count: number;
+  highlights: SummaryHighlight[];
 }
