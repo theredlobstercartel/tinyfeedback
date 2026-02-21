@@ -18,6 +18,7 @@ const demoFeedback: Feedback = {
   page_url: 'https://example.com/dashboard',
   user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   status: 'new',
+  workflow_status: 'new',
   internal_notes: '',
   response_sent: false,
   response_content: null,

@@ -11,6 +11,7 @@ export interface Feedback {
   page_url: string | null;
   user_agent: string | null;
   status: string;
+  workflow_status: 'new' | 'in_analysis' | 'implemented';
   internal_notes: string | null;
   response_sent: boolean;
   response_content: string | null;
@@ -33,6 +34,7 @@ export interface CreateFeedbackInput {
 
 export interface UpdateFeedbackInput {
   status?: string;
+  workflow_status?: 'new' | 'in_analysis' | 'implemented';
   internal_notes?: string;
   response_sent?: boolean;
   response_content?: string;

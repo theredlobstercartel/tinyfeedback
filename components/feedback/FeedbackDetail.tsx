@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Feedback } from '@/types';
 import { Save, X, FileText, Image, Globe, Monitor, Mail, Calendar, Bug, MessageSquare, Star } from 'lucide-react';
+import { StatusDropdown, WorkflowStatus, getStatusLabel, getStatusColor, getStatusBgColor } from './StatusDropdown';
 
 interface FeedbackDetailProps {
   feedback: Feedback;
@@ -12,9 +13,13 @@ interface FeedbackDetailProps {
 
 export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailProps) {
   const [internalNotes, setInternalNotes] = useState(feedback.internal_notes || '');
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>(feedback.workflow_status || 'new');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [statusSaveStatus, setStatusSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [statusErrorMessage, setStatusErrorMessage] = useState('');
   const [imageError, setImageError] = useState(false);
 
   const handleSaveNotes = useCallback(async () => {
@@ -52,35 +57,41 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
     }
   }, [feedback.id, internalNotes, onUpdate]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new':
-        return '#00d4ff';
-      case 'read':
-        return '#ffd700';
-      case 'responded':
-        return '#00ff88';
-      case 'archived':
-        return '#666666';
-      default:
-        return '#888888';
-    }
-  };
+  const handleStatusChange = useCallback(async (newStatus: WorkflowStatus) => {
+    setIsSavingStatus(true);
+    setStatusSaveStatus('idle');
+    setStatusErrorMessage('');
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'new':
-        return 'Novo';
-      case 'read':
-        return 'Lido';
-      case 'responded':
-        return 'Respondido';
-      case 'archived':
-        return 'Arquivado';
-      default:
-        return status;
+    try {
+      const response = await fetch(`/api/feedbacks/${feedback.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workflow_status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update status');
+      }
+
+      const { data } = await response.json();
+      setWorkflowStatus(newStatus);
+      setStatusSaveStatus('success');
+      onUpdate?.(data);
+
+      // Clear success status after 3 seconds
+      setTimeout(() => setStatusSaveStatus('idle'), 3000);
+    } catch (error) {
+      setStatusSaveStatus('error');
+      setStatusErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsSavingStatus(false);
     }
-  };
+  }, [feedback.id, onUpdate]);
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -155,18 +166,6 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
               <TypeIcon size={16} />
               {typeConfig.label}
             </div>
-
-            {/* Status Badge */}
-            <span
-              className="px-3 py-1.5 text-xs font-mono uppercase"
-              style={{
-                backgroundColor: `${getStatusColor(feedback.status)}20`,
-                color: getStatusColor(feedback.status),
-                border: `1px solid ${getStatusColor(feedback.status)}`,
-              }}
-            >
-              {getStatusLabel(feedback.status)}
-            </span>
           </div>
           <button
             onClick={onClose}
@@ -180,6 +179,37 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Workflow Status Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h3 style={{ color: '#ffffff', fontWeight: 500 }}>
+                  Status do Workflow
+                </h3>
+                <StatusDropdown
+                  currentStatus={workflowStatus}
+                  onStatusChange={handleStatusChange}
+                  disabled={isSavingStatus}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                {statusSaveStatus === 'success' && (
+                  <span style={{ color: '#00ff88', fontSize: '0.875rem' }}>
+                    Status atualizado!
+                  </span>
+                )}
+                {statusSaveStatus === 'error' && (
+                  <span style={{ color: '#ff4444', fontSize: '0.875rem' }}>
+                    Erro: {statusErrorMessage}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t" style={{ borderColor: '#222222' }} />
+
           {/* Title */}
           {feedback.title && (
             <h2 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
