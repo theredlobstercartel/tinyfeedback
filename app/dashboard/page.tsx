@@ -224,6 +224,25 @@ export default function DashboardPage() {
             >
               Configurações
             </a>
+            <a
+              href="/dashboard/billing"
+              className="px-6 py-3 font-medium transition-colors inline-flex items-center"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#888888',
+                border: '1px solid #444444',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#00d4ff';
+                e.currentTarget.style.color = '#00d4ff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#444444';
+                e.currentTarget.style.color = '#888888';
+              }}
+            >
+              Assinatura
+            </a>
           </div>
         </section>
 
