@@ -4,7 +4,7 @@
 -- Create notification_preferences table
 CREATE TABLE IF NOT EXISTS notification_preferences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id UUID NOT NULL REFERENCES bmad_projects(id) ON DELETE CASCADE,
   notify_nps BOOLEAN NOT NULL DEFAULT true,
   notify_suggestion BOOLEAN NOT NULL DEFAULT true,
   notify_bug BOOLEAN NOT NULL DEFAULT true,
@@ -32,9 +32,9 @@ CREATE POLICY "Users can read their project notification preferences"
   ON notification_preferences FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM projects 
-      WHERE projects.id = notification_preferences.project_id 
-      AND projects.user_id = auth.uid()
+      SELECT 1 FROM bmad_projects 
+      WHERE bmad_projects.id = notification_preferences.project_id 
+      AND bmad_projects.user_id = auth.uid()
     )
   );
 
@@ -43,9 +43,9 @@ CREATE POLICY "Users can create notification preferences for their projects"
   ON notification_preferences FOR INSERT
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM projects 
-      WHERE projects.id = notification_preferences.project_id 
-      AND projects.user_id = auth.uid()
+      SELECT 1 FROM bmad_projects 
+      WHERE bmad_projects.id = notification_preferences.project_id 
+      AND bmad_projects.user_id = auth.uid()
     )
   );
 
@@ -54,16 +54,16 @@ CREATE POLICY "Users can update their project notification preferences"
   ON notification_preferences FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM projects 
-      WHERE projects.id = notification_preferences.project_id 
-      AND projects.user_id = auth.uid()
+      SELECT 1 FROM bmad_projects 
+      WHERE bmad_projects.id = notification_preferences.project_id 
+      AND bmad_projects.user_id = auth.uid()
     )
   )
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM projects 
-      WHERE projects.id = notification_preferences.project_id 
-      AND projects.user_id = auth.uid()
+      SELECT 1 FROM bmad_projects 
+      WHERE bmad_projects.id = notification_preferences.project_id 
+      AND bmad_projects.user_id = auth.uid()
     )
   );
 
@@ -72,8 +72,8 @@ CREATE POLICY "Users can delete their project notification preferences"
   ON notification_preferences FOR DELETE
   USING (
     EXISTS (
-      SELECT 1 FROM projects 
-      WHERE projects.id = notification_preferences.project_id 
-      AND projects.user_id = auth.uid()
+      SELECT 1 FROM bmad_projects 
+      WHERE bmad_projects.id = notification_preferences.project_id 
+      AND bmad_projects.user_id = auth.uid()
     )
   );
