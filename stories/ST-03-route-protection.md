@@ -3,7 +3,7 @@
 **Epic:** Autenticação e Onboarding  
 **Priority:** Must  
 **Points:** 3  
-**Status:** ready-for-dev
+**Status:** ✅ Done
 
 ## Story Description
 Como founder, quero que rotas protegidas exijam autenticação, para que meus dados estejam seguros.
@@ -26,10 +26,26 @@ Como founder, quero que rotas protegidas exijam autenticação, para que meus da
 **Then** continua logado (sessão persistida)
 
 ## Technical Tasks
-- [ ] Criar middleware de autenticação
-- [ ] Configurar rotas protegidas
-- [ ] Implementar redirecionamento
-- [ ] Testar fluxo completo
+- [x] Criar middleware de autenticação
+- [x] Configurar rotas protegidas
+- [x] Implementar redirecionamento
+- [x] Testar fluxo completo
+
+## Implementation Summary
+
+### Files Modified
+- `lib/supabase/middleware.ts` - Added route protection logic
+- `lib/supabase/middleware.test.ts` - Tests for route protection
+
+### Features Implemented
+1. **Protected Routes**: /dashboard, /settings, /projects/*
+2. **Public Routes**: /login, /auth/callback, /, /api/*
+3. **Redirection**: Unauthenticated users redirected to /login
+4. **Session Persistence**: Using Supabase Auth session
+5. **Reverse Redirection**: Authenticated users redirected from /login to /dashboard
+
+### Commits
+- `6f13600` - feat(ST-03): add route protection for /settings and /projects
 
 ## Notes
 - Usar middleware.ts do Next.js
