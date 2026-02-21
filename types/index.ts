@@ -67,3 +67,29 @@ export interface UpdateProjectDomainsInput {
   action: 'add' | 'remove';
   domain: string;
 }
+
+// Notification Preferences Types - ST-28
+export type FeedbackType = 'nps' | 'suggestion' | 'bug';
+
+export interface NotificationPreferences {
+  id: string;
+  project_id: string;
+  notify_nps: boolean;
+  notify_suggestion: boolean;
+  notify_bug: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateNotificationPreferencesInput {
+  notify_nps?: boolean;
+  notify_suggestion?: boolean;
+  notify_bug?: boolean;
+}
+
+export interface NotificationTypeConfig {
+  type: FeedbackType;
+  label: string;
+  description: string;
+  field: 'notify_nps' | 'notify_suggestion' | 'notify_bug';
+}

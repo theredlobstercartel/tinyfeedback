@@ -1,4 +1,4 @@
-import { DomainManager } from '@/components/settings';
+import { DomainManager, NotificationPreferencesManager } from '@/components/settings';
 
 // Demo project ID for testing
 const DEMO_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -20,6 +20,11 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* Notification Preferences - ST-28 */}
+        <NotificationPreferencesManager 
+          projectId={DEMO_PROJECT_ID}
+        />
+
         {/* Domain Manager */}
         <DomainManager 
           projectId={DEMO_PROJECT_ID}
@@ -35,13 +40,13 @@ export default function SettingsPage() {
             color: '#888888'
           }}
         >
-          <h3 className="mb-3" style={{ color: '#ffffff' }}>Status da Implementação ST-19:</h3>
+          <h3 className="mb-3" style={{ color: '#ffffff' }}>Status da Implementação:</h3>
           <ul className="space-y-2 list-disc list-inside">
-            <li style={{ color: '#00ff88' }}>✅ AC-01: Adicionar domínio - Implementado</li>
-            <li style={{ color: '#00ff88' }}>✅ AC-02: Remover domínio - Implementado</li>
-            <li style={{ color: '#00ff88' }}>✅ AC-03: Validação - Implementado</li>
-            <li style={{ color: '#00ff88' }}>✅ Testes de domínio - 9 testes passando</li>
-            <li style={{ color: '#00ff88' }}>✅ Testes de API - 7 testes passando</li>
+            <li style={{ color: '#00ff88' }}>✅ ST-28: Preferências de Notificação - Implementado</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- AC-01: Filtro por tipo (NPS, Sugestão, Bug)</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- Tabela notification_preferences criada</li>
+            <li style={{ color: '#00ff88' }} className="ml-4">- UI Cyber-neon com toggles interativos</li>
+            <li style={{ color: '#00ff88' }}>✅ ST-19: Gerenciar Domínios - Implementado</li>
             <li style={{ color: '#00ff88' }}>✅ UI Cyber-neon - Sharp corners, neon green</li>
           </ul>
         </div>
