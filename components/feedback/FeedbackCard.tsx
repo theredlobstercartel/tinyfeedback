@@ -52,6 +52,25 @@ const statusConfig: Record<string, { label: string; color: string; bgColor: stri
   },
 };
 
+// Workflow status config - ST-14
+const workflowStatusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  new: {
+    label: 'Novo',
+    color: '#00d4ff',
+    bgColor: 'rgba(0, 212, 255, 0.15)',
+  },
+  in_analysis: {
+    label: 'Em Análise',
+    color: '#ffd700',
+    bgColor: 'rgba(255, 215, 0, 0.15)',
+  },
+  implemented: {
+    label: 'Implementado',
+    color: '#00ff88',
+    bgColor: 'rgba(0, 255, 136, 0.15)',
+  },
+};
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -86,6 +105,13 @@ export function FeedbackCard({ feedback, onClick }: FeedbackCardProps) {
     color: '#888888',
     bgColor: 'rgba(136, 136, 136, 0.15)',
   };
+  
+  // ST-14: Workflow status
+  const workflowStatus = workflowStatusConfig[feedback.workflow_status || 'new'] || {
+    label: feedback.workflow_status || 'Novo',
+    color: '#888888',
+    bgColor: 'rgba(136, 136, 136, 0.15)',
+  };
 
   const contentPreview = feedback.content.length > 150 
     ? feedback.content.slice(0, 150) + '...'
@@ -110,7 +136,7 @@ export function FeedbackCard({ feedback, onClick }: FeedbackCardProps) {
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Type Icon */}
           <div
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium"
@@ -134,6 +160,19 @@ export function FeedbackCard({ feedback, onClick }: FeedbackCardProps) {
             }}
           >
             {status.label}
+          </div>
+
+          {/* ST-14: Workflow Status Badge */}
+          <div
+            className="px-3 py-1.5 text-xs font-medium"
+            style={{
+              backgroundColor: workflowStatus.bgColor,
+              color: workflowStatus.color,
+              border: `1px solid ${workflowStatus.color}`,
+            }}
+            title="Status do Workflow"
+          >
+            {workflowStatus.label}
           </div>
         </div>
 
