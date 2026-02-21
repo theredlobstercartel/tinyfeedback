@@ -1,373 +1,269 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Loader2 } from 'lucide-react';
 
-interface NpsOverTimeData {
+interface NpsOverTimeDataPoint {
   date: string;
-  avgNps: number;
-  count: number;
+  npsScore: number | null;
+  promoters: number;
+  passives: number;
+  detractors: number;
+  totalResponses: number;
 }
 
 interface NpsOverTimeChartProps {
-  data: NpsOverTimeData[];
-  period: string;
-  onPeriodChange: (period: string) => void;
+  data: NpsOverTimeDataPoint[];
+  period: number;
+  onPeriodChange: (days: number) => void;
   isLoading?: boolean;
 }
 
-const periods = [
-  { value: '7d', label: '7 dias' },
-  { value: '30d', label: '30 dias' },
-  { value: '90d', label: '90 dias' },
-];
+export function NpsOverTimeChart({ data, period, onPeriodChange, isLoading }: NpsOverTimeChartProps) {
+  if (isLoading) {
+    return (
+      <div 
+        className="p-6 flex flex-col items-center justify-center"
+        style={{ 
+          backgroundColor: '#0a0a0a', 
+          border: '1px solid #222222',
+          minHeight: '300px'
+        }}
+      >
+        <Loader2 size={32} className="animate-spin" style={{ color: '#00ff88' }} />
+        <p style={{ color: '#666666', fontSize: '0.875rem', marginTop: '1rem' }}>
+          Carregando dados de NPS...
+        </p>
+      </div>
+    );
+  }
 
-// Tooltip types
-interface TooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    payload: NpsOverTimeData;
-  }>;
-  label?: string;
-}
+  if (!data || data.length === 0) {
+    return (
+      <div 
+        className="p-6 flex flex-col items-center justify-center"
+        style={{ 
+          backgroundColor: '#0a0a0a', 
+          border: '1px solid #222222',
+          minHeight: '300px'
+        }}
+      >
+        <p style={{ color: '#666666', fontSize: '0.875rem' }}>
+          Sem dados de NPS
+        </p>
+      </div>
+    );
+  }
 
-export function NpsOverTimeChart({
-  data,
-  period,
-  onPeriodChange,
-  isLoading = false,
-}: NpsOverTimeChartProps) {
-  const [hoveredData, setHoveredData] = useState<NpsOverTimeData | null>(null);
+  // Filter data based on selected period
+  const filteredData = data.slice(-period);
 
-  // Calculate average NPS for the period
-  const validNps = data.filter((d) => d.avgNps > 0).map((d) => d.avgNps);
-  const averageNps =
-    validNps.length > 0
-      ? Math.round((validNps.reduce((a, b) => a + b, 0) / validNps.length) * 10) / 10
-      : null;
-
-  // Format date for display
+  // Format date for display (DD/MM)
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR', {
-      day: 'numeric',
-      month: 'short',
+    return date.toLocaleDateString('pt-BR', { 
+      day: '2-digit',
+      month: '2-digit'
     });
   };
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: TooltipProps) => {
-    if (active && payload && payload.length) {
-      const item = payload[0].payload;
-      return (
-        <div
-          style={{
-            backgroundColor: '#0a0a0a',
-            border: '1px solid #333333',
-            padding: '12px',
-            borderRadius: '0px',
-          }}
-        >
-          <p style={{ color: '#ffffff', marginBottom: '4px', fontWeight: 600 }}>
-            {formatDate(item.date)}
-          </p>
-          <p style={{ color: '#00ff88', marginBottom: '2px' }}>
-            NPS: {item.avgNps > 0 ? item.avgNps.toFixed(1) : 'N/A'}
-          </p>
-          <p style={{ color: '#888888', fontSize: '0.75rem' }}>
-            {item.count} resposta{item.count !== 1 ? 's' : ''}
-          </p>
-        </div>
-      );
-    }
-    return null;
+  // Format full date for tooltip
+  const formatFullDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR', { 
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
   };
 
+  const chartData = filteredData.map(item => ({
+    ...item,
+    displayDate: formatDate(item.date),
+    npsDisplay: item.npsScore !== null ? item.npsScore : null,
+  }));
+
+  // Calculate average NPS for the period
+  const validNpsScores = filteredData
+    .filter(item => item.npsScore !== null)
+    .map(item => item.npsScore as number);
+  
+  const averageNps = validNpsScores.length > 0
+    ? Math.round((validNpsScores.reduce((a, b) => a + b, 0) / validNpsScores.length) * 10) / 10
+    : null;
+
+  // Calculate total responses
+  const totalResponses = filteredData.reduce((sum, item) => sum + item.totalResponses, 0);
+
   return (
-    <div
-      style={{
-        backgroundColor: '#0a0a0a',
-        border: '1px solid #222222',
-        padding: '24px',
+    <div 
+      className="p-6"
+      style={{ 
+        backgroundColor: '#0a0a0a', 
+        border: '1px solid #222222' 
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '16px',
-        }}
-      >
-        <div>
-          <h3
-            style={{
-              color: '#ffffff',
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              marginBottom: '4px',
-            }}
-          >
-            NPS ao Longo do Tempo
-          </h3>
-          <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-            Evolução da pontuação NPS por dia
-          </p>
-        </div>
+      {/* Header with filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h3 style={{ 
+          color: '#888888', 
+          fontSize: '0.875rem', 
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em'
+        }}>
+          Evolução do NPS
+        </h3>
 
         {/* Period Filter */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {periods.map((p) => (
+        <div 
+          className="flex"
+          style={{ 
+            border: '1px solid #333333',
+            backgroundColor: '#000000'
+          }}
+        >
+          {[7, 30, 90].map((days) => (
             <button
-              key={p.value}
-              onClick={() => onPeriodChange(p.value)}
-              disabled={isLoading}
+              key={days}
+              onClick={() => onPeriodChange(days)}
               style={{
-                padding: '8px 16px',
-                backgroundColor: period === p.value ? '#00ff88' : 'transparent',
-                color: period === p.value ? '#000000' : '#888888',
-                border: `1px solid ${period === p.value ? '#00ff88' : '#444444'}`,
-                fontSize: '0.875rem',
-                fontWeight: period === p.value ? 600 : 400,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.5 : 1,
+                padding: '0.5rem 1rem',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                backgroundColor: period === days ? '#00ff88' : 'transparent',
+                color: period === days ? '#000000' : '#888888',
+                border: 'none',
+                borderRight: days !== 90 ? '1px solid #333333' : 'none',
+                cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (period !== p.value && !isLoading) {
-                  e.currentTarget.style.borderColor = '#00ff88';
+              onMouseEnter={(e) => {
+                if (period !== days) {
                   e.currentTarget.style.color = '#00ff88';
+                  e.currentTarget.style.backgroundColor = 'rgba(0, 255, 136, 0.1)';
                 }
               }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (period !== p.value && !isLoading) {
-                  e.currentTarget.style.borderColor = '#444444';
+              onMouseLeave={(e) => {
+                if (period !== days) {
                   e.currentTarget.style.color = '#888888';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }
               }}
             >
-              {p.label}
+              {days}d
             </button>
           ))}
         </div>
       </div>
 
-      {/* Average Display */}
-      {averageNps !== null && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            marginBottom: '20px',
-            padding: '12px 16px',
-            backgroundColor: '#000000',
-            border: '1px solid #222222',
-          }}
-        >
-          <div>
-            <p style={{ color: '#888888', fontSize: '0.75rem', marginBottom: '2px' }}>
-              Média do Período
-            </p>
-            <p
-              style={{
-                color: averageNps >= 9 ? '#00ff88' : averageNps >= 7 ? '#ffd700' : '#ff4444',
-                fontSize: '1.5rem',
-                fontWeight: 700,
-              }}
-            >
-              {averageNps.toFixed(1)}
-            </p>
-          </div>
-          <div
-            style={{
-              width: '1px',
-              height: '32px',
-              backgroundColor: '#333333',
-            }}
-          />
-          <div>
-            <p style={{ color: '#888888', fontSize: '0.75rem', marginBottom: '2px' }}>
-              Total de Respostas
-            </p>
-            <p style={{ color: '#ffffff', fontSize: '1.25rem', fontWeight: 600 }}>
-              {data.reduce((sum, d) => sum + d.count, 0)}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Chart */}
-      <div style={{ width: '100%', height: '300px' }}>
-        {isLoading ? (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+      <div style={{ height: 250 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{
+              top: 10,
+              right: 10,
+              left: -20,
+              bottom: 0,
             }}
           >
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                border: '2px solid #222222',
-                borderTop: '2px solid #00ff88',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke="#222222" 
+              vertical={false}
             />
-          </div>
-        ) : data.length === 0 || data.every((d) => d.avgNps === 0) ? (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#666666',
-            }}
-          >
-            <p>Sem dados de NPS para este período</p>
-            <p style={{ fontSize: '0.875rem', marginTop: '8px' }}>
-              As respostas NPS aparecerão aqui
-            </p>
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={data}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              onMouseMove={(e: unknown) => {
-                const event = e as { activePayload?: Array<{ payload: NpsOverTimeData }> };
-                if (event.activePayload) {
-                  setHoveredData(event.activePayload[0].payload);
-                }
+            <XAxis 
+              dataKey="displayDate"
+              stroke="#444444"
+              tick={{ fill: '#666666', fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: '#333333' }}
+              interval="preserveStartEnd"
+              minTickGap={20}
+            />
+            <YAxis 
+              stroke="#444444"
+              tick={{ fill: '#666666', fontSize: 10 }}
+              tickLine={false}
+              axisLine={{ stroke: '#333333' }}
+              domain={[0, 10]}
+              ticks={[0, 2, 4, 6, 8, 10]}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#0a0a0a',
+                border: '1px solid #333333',
+                borderRadius: 0,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
               }}
-              onMouseLeave={() => setHoveredData(null)}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#222222"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="date"
-                tickFormatter={formatDate}
-                stroke="#666666"
-                tick={{ fill: '#666666', fontSize: 12 }}
-                axisLine={{ stroke: '#333333' }}
-                tickLine={false}
-              />
-              <YAxis
-                domain={[0, 10]}
-                stroke="#666666"
-                tick={{ fill: '#666666', fontSize: 12 }}
-                axisLine={{ stroke: '#333333' }}
-                tickLine={false}
-                ticks={[0, 2, 4, 6, 8, 10]}
-              />
-              <Tooltip content={<CustomTooltip />} />
-
-              {/* Reference lines for NPS zones */}
-              <ReferenceLine
-                y={9}
-                stroke="#00ff88"
-                strokeDasharray="5 5"
-                strokeOpacity={0.3}
-              />
-              <ReferenceLine
-                y={7}
-                stroke="#ffd700"
-                strokeDasharray="5 5"
-                strokeOpacity={0.3}
-              />
-              <ReferenceLine
-                y={6}
-                stroke="#ff4444"
-                strokeDasharray="5 5"
-                strokeOpacity={0.3}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="avgNps"
-                stroke="#00ff88"
-                strokeWidth={2}
-                dot={{
-                  fill: '#00ff88',
-                  strokeWidth: 0,
-                  r: 4,
-                }}
-                activeDot={{
-                  fill: '#00ff88',
-                  stroke: '#ffffff',
-                  strokeWidth: 2,
-                  r: 6,
-                }}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
+              labelStyle={{
+                color: '#00ff88',
+                fontSize: '0.75rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '0.5rem',
+              }}
+              itemStyle={{
+                color: '#ffffff',
+                fontSize: '0.875rem',
+              }}
+              formatter={(value) => {
+                const numValue = value as number | null | undefined;
+                return numValue !== null && numValue !== undefined
+                  ? [`NPS: ${numValue.toFixed(1)}`, '']
+                  : ['Sem dados', ''];
+              }}
+              labelFormatter={(label, payload) => {
+                if (payload && payload[0]) {
+                  return formatFullDate(payload[0].payload.date);
+                }
+                return label;
+              }}
+              cursor={{ stroke: '#00ff88', strokeWidth: 1, strokeDasharray: '3 3' }}
+            />
+            <Line 
+              type="monotone"
+              dataKey="npsDisplay" 
+              stroke="#00d4ff"
+              strokeWidth={2}
+              dot={{ fill: '#00d4ff', strokeWidth: 0, r: 3 }}
+              activeDot={{ fill: '#00ff88', strokeWidth: 0, r: 5 }}
+              animationDuration={1000}
+              connectNulls={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* Legend */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '24px',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid #222222',
-        }}
+      {/* Summary stats */}
+      <div 
+        className="mt-4 pt-4 flex justify-between items-center"
+        style={{ borderTop: '1px solid #222222' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#00ff88',
-            }}
-          />
-          <span style={{ color: '#888888', fontSize: '0.75rem' }}>Promotores (9-10)</span>
+        <div>
+          <p style={{ color: '#666666', fontSize: '0.75rem' }}>
+            Média NPS ({period}d)
+          </p>
+          <p style={{ 
+            color: averageNps !== null 
+              ? averageNps >= 8 ? '#00ff88' : averageNps >= 6 ? '#ffd700' : '#ff4444'
+              : '#666666', 
+            fontSize: '1.25rem', 
+            fontWeight: 600 
+          }}>
+            {averageNps !== null ? averageNps.toFixed(1) : '-'}
+          </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#ffd700',
-            }}
-          />
-          <span style={{ color: '#888888', fontSize: '0.75rem' }}>Neutros (7-8)</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#ff4444',
-            }}
-          />
-          <span style={{ color: '#888888', fontSize: '0.75rem' }}>Detratores (0-6)</span>
+        <div className="text-right">
+          <p style={{ color: '#666666', fontSize: '0.75rem' }}>
+            Total de respostas
+          </p>
+          <p style={{ color: '#00d4ff', fontSize: '1.25rem', fontWeight: 600 }}>
+            {totalResponses}
+          </p>
         </div>
       </div>
     </div>

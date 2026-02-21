@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Check, X, Loader2, Sparkles, ArrowRight } from 'lucide-react';
 import { PLAN_CONFIG } from '@/lib/stripe';
 
-export default function UpgradePage() {
+function UpgradeContent() {
   const searchParams = useSearchParams();
   const canceled = searchParams.get('canceled');
   
@@ -304,5 +304,17 @@ export default function UpgradePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
+        <Loader2 size={48} className="animate-spin" style={{ color: '#00ff88' }} />
+      </div>
+    }>
+      <UpgradeContent />
+    </Suspense>
   );
 }

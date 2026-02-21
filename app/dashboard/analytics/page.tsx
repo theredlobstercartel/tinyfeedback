@@ -17,10 +17,13 @@ import {
 import type { Project } from '@/types';
 import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution, NpsOverTimeChart } from '@/components/analytics';
 
-interface NpsOverTimeData {
+interface NpsOverTimeDataPoint {
   date: string;
-  nps: number | null;
-  responses: number;
+  npsScore: number | null;
+  promoters: number;
+  passives: number;
+  detractors: number;
+  totalResponses: number;
 }
 
 interface AnalyticsData {
@@ -49,26 +52,18 @@ interface AnalyticsData {
   }[];
 }
 
-interface NpsOverTimeData {
-  data: {
-    date: string;
-    avgNps: number;
-    count: number;
-  }[];
-  period: string;
-  days: number;
-}
-
 export default function AnalyticsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [npsOverTime, setNpsOverTime] = useState<NpsOverTimeData | null>(null);
-  const [npsPeriod, setNpsPeriod] = useState<string>('30d');
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingNpsOverTime, setIsLoadingNpsOverTime] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // NPS Over Time state
+  const [npsOverTimeData, setNpsOverTimeData] = useState<NpsOverTimeDataPoint[]>([]);
+  const [npsPeriod, setNpsPeriod] = useState<number>(30);
+  const [isNpsLoading, setIsNpsLoading] = useState(false);
 
   // Load user and project
   useEffect(() => {
@@ -119,44 +114,43 @@ export default function AnalyticsPage() {
     }
   }, [project?.id]);
 
-  // Load NPS over time data
-  const loadNpsOverTime = useCallback(async () => {
-    if (!project?.id) return;
-
-    setIsLoadingNpsOverTime(true);
-
-    try {
-      const response = await fetch(`/api/analytics/nps-over-time?project_id=${project.id}&period=${npsPeriod}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch NPS over time data');
-      }
-
-      const data = await response.json();
-      setNpsOverTime(data);
-    } catch (err) {
-      console.error('Error loading NPS over time:', err);
-      // Don't set global error, just log it
-    } finally {
-      setIsLoadingNpsOverTime(false);
-    }
-  }, [project?.id, npsPeriod]);
-
   // Load analytics when project is available
   useEffect(() => {
     if (project?.id) {
       loadAnalytics();
-      loadNpsOverTime();
     }
-  }, [project?.id, loadAnalytics, loadNpsOverTime]);
+  }, [project?.id, loadAnalytics]);
 
-  // Reload NPS over time when period changes
+  // Load NPS over time data
+  const loadNpsOverTime = useCallback(async () => {
+    if (!project?.id) return;
+
+    setIsNpsLoading(true);
+
+    try {
+      const response = await fetch(`/api/analytics/nps-over-time?project_id=${project.id}&days=${npsPeriod}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch NPS data');
+      }
+
+      const data = await response.json();
+      setNpsOverTimeData(data.data);
+    } catch (err) {
+      console.error('Error loading NPS over time:', err);
+      // Don't set error state - NPS chart can fail independently
+    } finally {
+      setIsNpsLoading(false);
+    }
+  }, [project?.id, npsPeriod]);
+
+  // Load NPS over time when project or period changes
   useEffect(() => {
     if (project?.id) {
       loadNpsOverTime();
     }
-  }, [npsPeriod, project?.id, loadNpsOverTime]);
+  }, [project?.id, npsPeriod, loadNpsOverTime]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -310,16 +304,6 @@ export default function AnalyticsPage() {
               />
             </div>
 
-            {/* NPS Over Time Chart */}
-            <div className="grid grid-cols-1 gap-6">
-              <NpsOverTimeChart 
-                data={npsOverTime?.data || []}
-                period={npsPeriod}
-                onPeriodChange={setNpsPeriod}
-                isLoading={isLoadingNpsOverTime}
-              />
-            </div>
-
             {/* Secondary Stats & Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* NPS Gauge */}
@@ -336,6 +320,14 @@ export default function AnalyticsPage() {
 
             {/* Volume Chart - Full Width */}
             <VolumeChart data={analytics.volumeData} />
+
+            {/* NPS Over Time Chart - Full Width */}
+            <NpsOverTimeChart
+              data={npsOverTimeData}
+              period={npsPeriod}
+              onPeriodChange={setNpsPeriod}
+              isLoading={isNpsLoading}
+            />
 
             {/* Additional Metrics */}
             <div 

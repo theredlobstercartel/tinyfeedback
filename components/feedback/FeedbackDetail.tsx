@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { Feedback } from '@/types';
-import { Save, X, FileText, Image, Globe, Monitor, Mail, Calendar, Bug, MessageSquare, Star } from 'lucide-react';
-import { StatusDropdown, WorkflowStatus, getStatusLabel, getStatusColor, getStatusBgColor } from './StatusDropdown';
+import { Save, X, FileText, Image, Globe, Monitor, Mail, Calendar, Bug, MessageSquare, Star, Send, CheckCircle } from 'lucide-react';
+import { StatusDropdown, WorkflowStatus } from './StatusDropdown';
 
 interface FeedbackDetailProps {
   feedback: Feedback;
@@ -21,6 +21,13 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
   const [errorMessage, setErrorMessage] = useState('');
   const [statusErrorMessage, setStatusErrorMessage] = useState('');
   const [imageError, setImageError] = useState(false);
+  
+  // Response state
+  const [responseSent, setResponseSent] = useState(feedback.response_sent || false);
+  const [responseContent, setResponseContent] = useState(feedback.response_content || '');
+  const [isSavingResponse, setIsSavingResponse] = useState(false);
+  const [responseSaveStatus, setResponseSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [responseErrorMessage, setResponseErrorMessage] = useState('');
 
   const handleSaveNotes = useCallback(async () => {
     setIsSaving(true);
@@ -92,6 +99,42 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
       setIsSavingStatus(false);
     }
   }, [feedback.id, onUpdate]);
+
+  const handleSaveResponse = useCallback(async () => {
+    setIsSavingResponse(true);
+    setResponseSaveStatus('idle');
+    setResponseErrorMessage('');
+
+    try {
+      const response = await fetch(`/api/feedbacks/${feedback.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response_sent: responseSent,
+          response_content: responseSent ? responseContent : null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save response');
+      }
+
+      const { data } = await response.json();
+      setResponseSaveStatus('success');
+      onUpdate?.(data);
+
+      // Clear success status after 3 seconds
+      setTimeout(() => setResponseSaveStatus('idle'), 3000);
+    } catch (error) {
+      setResponseSaveStatus('error');
+      setResponseErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsSavingResponse(false);
+    }
+  }, [feedback.id, responseSent, responseContent, onUpdate]);
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -433,6 +476,111 @@ export function FeedbackDetail({ feedback, onClose, onUpdate }: FeedbackDetailPr
               >
                 <Save size={16} />
                 {isSaving ? 'Salvando...' : 'Salvar Notas'}
+              </button>
+            </div>
+          </div>
+
+          {/* Response Section */}
+          <div className="space-y-3 pt-4 border-t" style={{ borderColor: '#222222' }}>
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} style={{ color: '#00d4ff' }} />
+              <h3 style={{ color: '#ffffff', fontWeight: 500 }}>
+                Resposta ao Usuário
+              </h3>
+              <span
+                className="px-2 py-0.5 text-xs"
+                style={{
+                  backgroundColor: responseSent ? '#00ff8820' : '#ffd70020',
+                  color: responseSent ? '#00ff88' : '#ffd700',
+                  border: `1px solid ${responseSent ? '#00ff88' : '#ffd700'}`,
+                }}
+              >
+                {responseSent ? 'RESPONDIDO' : 'PENDENTE'}
+              </span>
+            </div>
+
+            {/* Checkbox for response_sent */}
+            <div className="flex items-center gap-3 p-3" style={{ backgroundColor: '#000000', border: '1px solid #222222' }}>
+              <input
+                type="checkbox"
+                id="response-sent"
+                checked={responseSent}
+                onChange={(e) => setResponseSent(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+                style={{ accentColor: '#00ff88' }}
+              />
+              <label htmlFor="response-sent" style={{ color: '#ffffff', fontSize: '0.875rem', cursor: 'pointer' }}>
+                Marcar como Respondido
+              </label>
+            </div>
+
+            {/* Response content textarea - only shows when checked */}
+            {responseSent && (
+              <div className="space-y-2 animate-fade-in">
+                <p style={{ color: '#888888', fontSize: '0.875rem' }}>
+                  Conteúdo da Resposta
+                </p>
+                <textarea
+                  value={responseContent}
+                  onChange={(e) => setResponseContent(e.target.value)}
+                  placeholder="Digite a resposta que foi enviada ao usuário..."
+                  className="w-full p-3 text-sm resize-none focus:outline-none transition-colors"
+                  style={{
+                    backgroundColor: '#000000',
+                    border: '1px solid #222222',
+                    color: '#ffffff',
+                    minHeight: '120px',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#00d4ff';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#222222';
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {responseSaveStatus === 'success' && (
+                  <span style={{ color: '#00ff88', fontSize: '0.875rem' }}>
+                    Resposta salva com sucesso!
+                  </span>
+                )}
+                {responseSaveStatus === 'error' && (
+                  <span style={{ color: '#ff4444', fontSize: '0.875rem' }}>
+                    Erro: {responseErrorMessage}
+                  </span>
+                )}
+                {!feedback.user_email && responseSent && (
+                  <span style={{ color: '#ffd700', fontSize: '0.75rem' }}>
+                    ⚠️ Usuário não informou email. A resposta será salva mas não enviada.
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={handleSaveResponse}
+                disabled={isSavingResponse}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: isSavingResponse ? '#00d4ff40' : '#00d4ff',
+                  color: '#000000',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSavingResponse) {
+                    e.currentTarget.style.backgroundColor = '#00aaff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSavingResponse) {
+                    e.currentTarget.style.backgroundColor = '#00d4ff';
+                  }
+                }}
+              >
+                <Send size={16} />
+                {isSavingResponse ? 'Salvando...' : 'Enviar Resposta'}
               </button>
             </div>
           </div>

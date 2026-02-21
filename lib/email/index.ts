@@ -1,5 +1,5 @@
 // Email service exports
-export { sendEmail, sendNewFeedbackEmail, sendDailySummaryEmail, sendWeeklySummaryEmail, isEmailServiceConfigured } from './service';
+export { sendEmail, sendNewFeedbackEmail, sendDailySummaryEmail, sendWeeklySummaryEmail, sendResponseEmail, isEmailServiceConfigured } from './service';
 export type { SendEmailOptions } from './service';
 
 // Email templates
@@ -8,6 +8,12 @@ export {
   generateNewFeedbackEmailText,
   type NewFeedbackEmailData,
 } from './new-feedback-template';
+
+export {
+  generateResponseEmailHTML,
+  generateResponseEmailText,
+  type ResponseEmailData,
+} from './response-template';
 
 export {
   generateSummaryEmailHTML,
