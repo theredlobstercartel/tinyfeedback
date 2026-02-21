@@ -48,7 +48,7 @@ export function FeedbackCounter({ projectId, isPro }: FeedbackCounterProps) {
   async function loadProjectData() {
     try {
       const { data, error } = await supabase
-        .from('bmad_projects')
+        .from('projects')
         .select('*')
         .eq('id', projectId)
         .single();

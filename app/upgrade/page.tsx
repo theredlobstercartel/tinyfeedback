@@ -28,7 +28,7 @@ function UpgradeContent() {
       if (user) {
         // Fetch user's project (for demo, we'll use the first project)
         const { data: projects } = await supabase
-          .from('bmad_projects')
+          .from('projects')
           .select('*')
           .eq('user_id', user.id)
           .limit(1);

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Fetch project to check if it already has a Stripe customer
     const { data: project, error: projectError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('id, name, stripe_customer_id')
       .eq('id', projectId)
       .single();
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Save customer ID to project
       await supabase
-        .from('bmad_projects')
+        .from('projects')
         .update({ stripe_customer_id: customerId })
         .eq('id', projectId);
     }

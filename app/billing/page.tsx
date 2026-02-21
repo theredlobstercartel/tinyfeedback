@@ -27,7 +27,7 @@ export default function BillingPage() {
       }
 
       const { data: project } = await supabase
-        .from('bmad_projects')
+        .from('projects')
         .select('*')
         .eq('user_id', user.id)
         .single();

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Verify API key matches project
     const { data: project, error: projectError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('id, api_key, allowed_domains, feedbacks_count, max_feedbacks, monthly_feedbacks_count, monthly_feedbacks_reset_at, plan, subscription_status')
       .eq('id', project_id)
       .single();
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Increment counters
       const newMonthlyCount = monthlyCount + 1;
       await supabase
-        .from('bmad_projects')
+        .from('projects')
         .update({ 
           feedbacks_count: (project.feedbacks_count || 0) + 1,
           monthly_feedbacks_count: newMonthlyCount,
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Increment project feedback count
     await supabase
-      .from('bmad_projects')
+      .from('projects')
       .update({ feedbacks_count: (project.feedbacks_count || 0) + 1 })
       .eq('id', project_id);
 

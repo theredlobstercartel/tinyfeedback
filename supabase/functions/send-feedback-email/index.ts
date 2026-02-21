@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
 
     // Fetch project details
     const { data: project, error: projectError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('id, name, slug, user_id')
       .eq('id', feedback.project_id)
       .single();

@@ -43,7 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Fetch updated project data
     const { data: project, error } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('*')
       .eq('id', projectId)
       .single();

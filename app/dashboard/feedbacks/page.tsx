@@ -59,7 +59,7 @@ export default function FeedbacksPage() {
       setUser(user);
       
       const { data: project } = await supabase
-        .from('bmad_projects')
+        .from('projects')
         .select('*')
         .eq('user_id', user.id)
         .single();

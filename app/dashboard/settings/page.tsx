@@ -25,7 +25,7 @@ export default function SettingsPage() {
         if (user) {
           // Fetch user's project
           const { data: projects, error: projectError } = await supabase
-            .from('bmad_projects')
+            .from('projects')
             .select('*')
             .eq('user_id', user.id)
             .limit(1);

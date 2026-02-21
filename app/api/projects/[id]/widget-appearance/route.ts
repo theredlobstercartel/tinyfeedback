@@ -22,7 +22,7 @@ export async function GET(
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data, error } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('id, name, widget_color, widget_position, widget_text')
       .eq('id', id)
       .single();
@@ -114,7 +114,7 @@ export async function PATCH(
 
     // Update project
     const { data, error: updateError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .update(updates)
       .eq('id', id)
       .select('id, name, widget_color, widget_position, widget_text')

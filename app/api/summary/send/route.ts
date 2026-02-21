@@ -41,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Get project and user info
     const { data: project, error: projectError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('id, name, user_id')
       .eq('id', projectId)
       .single();

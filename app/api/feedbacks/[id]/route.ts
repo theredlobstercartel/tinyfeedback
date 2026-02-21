@@ -83,7 +83,7 @@ export async function PATCH(
     let projectName = 'Projeto';
     if (currentFeedback.project_id) {
       const { data: projectData } = await supabase
-        .from('bmad_projects')
+        .from('projects')
         .select('name')
         .eq('id', currentFeedback.project_id)
         .single();

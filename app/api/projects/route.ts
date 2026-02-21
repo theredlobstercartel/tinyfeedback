@@ -80,7 +80,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     while (slugExists) {
       const checkSlug = slugSuffix > 0 ? `${slug}-${slugSuffix}` : slug;
       const { data: existingProject } = await supabase
-        .from('bmad_projects')
+        .from('projects')
         .select('id')
         .eq('slug', checkSlug)
         .maybeSingle();
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create project
     const now = new Date().toISOString();
     const { data: project, error: createError } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .insert({
         name,
         slug,
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const { data: projects, error } = await supabase
-      .from('bmad_projects')
+      .from('projects')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
