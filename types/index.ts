@@ -51,6 +51,9 @@ export interface Project {
   plan: string;
   feedbacks_count: number;
   max_feedbacks: number;
+  // ST-29: Monthly feedback counter for Free plan
+  monthly_feedbacks_count: number;
+  monthly_feedbacks_reset_at: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   subscription_status: string | null;

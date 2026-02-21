@@ -17,6 +17,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
 };
 
+// Free plan limits
+const FREE_PLAN_LIMIT = 100;
+const WARNING_THRESHOLD = 80;
+
 /**
  * POST /api/widget/feedback
  * Create new feedback from widget
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Verify API key matches project
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, api_key, allowed_domains, feedbacks_count, max_feedbacks')
+      .select('id, api_key, allowed_domains, feedbacks_count, max_feedbacks, monthly_feedbacks_count, monthly_feedbacks_reset_at, plan, subscription_status')
       .eq('id', project_id)
       .single();
 
@@ -118,7 +122,109 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Check feedback quota
+    // Check if project is on Free plan
+    const isPro = project.plan === 'pro' && project.subscription_status === 'active';
+    
+    if (!isPro) {
+      // Reset monthly counter if it's a new month
+      let monthlyCount = project.monthly_feedbacks_count || 0;
+      const lastReset = project.monthly_feedbacks_reset_at;
+      const now = new Date();
+      
+      // Check if we need to reset (new month)
+      if (lastReset) {
+        const lastResetDate = new Date(lastReset);
+        const isNewMonth = lastResetDate.getMonth() !== now.getMonth() || 
+                          lastResetDate.getFullYear() !== now.getFullYear();
+        
+        if (isNewMonth) {
+          monthlyCount = 0;
+        }
+      }
+
+      // AC-03: Block feedback if limit reached
+      if (monthlyCount >= FREE_PLAN_LIMIT) {
+        return NextResponse.json(
+          { 
+            error: 'LIMIT_REACHED',
+            message: 'Este projeto atingiu o limite de 100 feedbacks este mês. Faça upgrade para o plano Pro para continuar recebendo feedbacks.',
+            upgrade_url: '/billing',
+            current_count: monthlyCount,
+            limit: FREE_PLAN_LIMIT
+          },
+          { status: 429, headers: corsHeaders }
+        );
+      }
+
+      // AC-02: Check if approaching limit (80+ feedbacks)
+      const isWarning = monthlyCount >= WARNING_THRESHOLD;
+
+      // Insert feedback
+      const { data: feedback, error: insertError } = await supabase
+        .from('feedbacks')
+        .insert({
+          project_id,
+          type,
+          nps_score: nps_score ?? null,
+          content: content || 'No description provided',
+          title: title || null,
+          page_url: page_url || null,
+          user_agent: user_agent || request.headers.get('user-agent') || null,
+          user_email: user_email || null,
+          user_id: user_id || null,
+          screenshot_url: screenshot_url || null,
+          status: 'new',
+          response_sent: false,
+          internal_notes: null,
+          response_content: null
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error inserting feedback:', insertError);
+        return NextResponse.json(
+          { error: 'Failed to save feedback' },
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      // Increment counters
+      const newMonthlyCount = monthlyCount + 1;
+      await supabase
+        .from('projects')
+        .update({ 
+          feedbacks_count: (project.feedbacks_count || 0) + 1,
+          monthly_feedbacks_count: newMonthlyCount,
+          monthly_feedbacks_reset_at: now.toISOString()
+        })
+        .eq('id', project_id);
+
+      // Build response with warning if approaching limit
+      const responseData: Record<string, unknown> = { 
+        success: true, 
+        data: feedback 
+      };
+
+      // AC-02: Add warning message if at or above 80 feedbacks
+      if (isWarning) {
+        responseData.warning = {
+          message: 'Quase no limite!',
+          detail: `Este projeto já recebeu ${newMonthlyCount} de ${FREE_PLAN_LIMIT} feedbacks este mês. Considere fazer upgrade para o plano Pro.`,
+          current_count: newMonthlyCount,
+          limit: FREE_PLAN_LIMIT,
+          upgrade_url: '/billing'
+        };
+      }
+
+      return NextResponse.json(
+        responseData,
+        { status: 201, headers: { ...corsHeaders, ...rateLimitHeaders } }
+      );
+    }
+
+    // Pro plan: No monthly limits
+    // Check total feedback quota (for Pro, this might be higher)
     if (project.feedbacks_count >= project.max_feedbacks) {
       return NextResponse.json(
         { error: 'Feedback quota exceeded for this project' },
@@ -150,7 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Insert feedback
+    // Insert feedback for Pro users
     const { data: feedback, error: insertError } = await supabase
       .from('feedbacks')
       .insert({

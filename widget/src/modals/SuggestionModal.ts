@@ -199,8 +199,26 @@ export class SuggestionModal {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        
+        // AC-02: Show warning if approaching limit
+        if (data.warning) {
+          this.showWarning(data.warning.message, data.warning.detail);
+          // Still close after showing warning briefly
+          setTimeout(() => this.close(), 3000);
+          return;
+        }
+        
         this.showThankYou();
         this.options.onSubmit?.(title, description);
+      } else if (response.status === 429) {
+        // AC-03: Handle limit reached
+        const errorData = await response.json();
+        if (errorData.error === 'LIMIT_REACHED') {
+          this.showLimitReached(errorData.message);
+        } else {
+          this.showError('Falha ao enviar sugestão. Tente novamente.');
+        }
       } else {
         console.error('Failed to submit suggestion');
         this.showError('Falha ao enviar sugestão. Tente novamente.');
@@ -209,6 +227,51 @@ export class SuggestionModal {
       console.error('Error submitting suggestion:', error);
       this.showError('Falha ao enviar sugestão. Tente novamente.');
     }
+  }
+
+  /**
+   * Show warning message
+   */
+  private showWarning(title: string, detail: string): void {
+    if (!this.container) return;
+
+    const modal = this.container.querySelector('#tf-suggestion-content');
+    if (modal) {
+      modal.innerHTML = `
+        <div style="${this.getWarningStyles()}">
+          <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+          <h3 style="${this.getTitleStyles()}">${title}</h3>
+          <p style="${this.getSubtitleStyles()}">${detail}</p>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Show limit reached message (AC-03)
+   */
+  private showLimitReached(message: string): void {
+    if (!this.container) return;
+
+    const modal = this.container.querySelector('#tf-suggestion-content');
+    if (modal) {
+      modal.innerHTML = `
+        <div style="${this.getLimitReachedStyles()}">
+          <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+          <h3 style="${this.getTitleStyles()}">Limite Atingido</h3>
+          <p style="${this.getSubtitleStyles()}">${message}</p>
+          <button 
+            onclick="window.open('/billing', '_blank')"
+            style="${this.getUpgradeButtonStyles()}"
+          >
+            Fazer Upgrade
+          </button>
+        </div>
+      `;
+    }
+
+    // Auto close after 5 seconds
+    setTimeout(() => this.close(), 5000);
   }
 
   /**
@@ -407,6 +470,38 @@ export class SuggestionModal {
     return `
       text-align: center;
       padding: 40px 20px;
+    `;
+  }
+
+  private getWarningStyles(): string {
+    return `
+      text-align: center;
+      padding: 40px 20px;
+      border: 1px solid #ffaa00;
+      background: rgba(255, 170, 0, 0.1);
+    `;
+  }
+
+  private getLimitReachedStyles(): string {
+    return `
+      text-align: center;
+      padding: 40px 20px;
+      border: 1px solid #ff4444;
+      background: rgba(255, 68, 68, 0.1);
+    `;
+  }
+
+  private getUpgradeButtonStyles(): string {
+    return `
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #ffd700;
+      color: #000;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
     `;
   }
 }

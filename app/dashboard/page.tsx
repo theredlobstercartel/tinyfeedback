@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { LogOut, Loader2, Sparkles, MessageSquare } from 'lucide-react';
+import { FeedbackCounter } from '@/components/FeedbackCounter';
 import type { Project } from '@/types';
 
 export default function DashboardPage() {
@@ -155,23 +156,13 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div 
-            className="p-6"
-            style={{ 
-              backgroundColor: '#0a0a0a', 
-              border: '1px solid #222222' 
-            }}
-          >
-            <h3 style={{ color: '#888888', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-              Feedbacks
-            </h3>
-            <p 
-              className="text-3xl font-bold"
-              style={{ color: '#00d4ff' }}
-            >
-              0
-            </p>
-          </div>
+          {/* AC-01: Feedback Counter for Free Plan */}
+          {project && (
+            <FeedbackCounter 
+              projectId={project.id} 
+              isPro={isPro} 
+            />
+          )}
 
           <div 
             className="p-6"
