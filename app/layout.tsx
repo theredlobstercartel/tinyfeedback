@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TinyFeedback - Internal Notes Demo",
-  description: "TinyFeedback Dashboard with Internal Notes Feature",
+  title: "TinyFeedback - Collect User Feedback That Actually Matters",
+  description: "The modern feedback platform for SaaS products. Collect, analyze, and act on user feedback with AI-powered insights.",
 };
 
 export default function RootLayout({

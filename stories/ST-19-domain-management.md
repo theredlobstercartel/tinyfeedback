@@ -4,7 +4,7 @@
 **Epic:** Configurações do Projeto  
 **Priority:** Must  
 **Points:** 3  
-**Status:** ✅ review
+**Status:** ✅ Done
 
 ## Story
 Como founder, quero adicionar/remover domínios que podem usar meu widget.
