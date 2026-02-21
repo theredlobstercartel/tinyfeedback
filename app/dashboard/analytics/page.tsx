@@ -15,7 +15,13 @@ import {
   Calendar
 } from 'lucide-react';
 import type { Project } from '@/types';
-import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution } from '@/components/analytics';
+import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution, NpsOverTimeChart } from '@/components/analytics';
+
+interface NpsOverTimeData {
+  date: string;
+  nps: number | null;
+  responses: number;
+}
 
 interface AnalyticsData {
   totalFeedbacks: number;
@@ -43,12 +49,25 @@ interface AnalyticsData {
   }[];
 }
 
+interface NpsOverTimeData {
+  data: {
+    date: string;
+    avgNps: number;
+    count: number;
+  }[];
+  period: string;
+  days: number;
+}
+
 export default function AnalyticsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [npsOverTime, setNpsOverTime] = useState<NpsOverTimeData | null>(null);
+  const [npsPeriod, setNpsPeriod] = useState<string>('30d');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingNpsOverTime, setIsLoadingNpsOverTime] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load user and project
@@ -100,12 +119,44 @@ export default function AnalyticsPage() {
     }
   }, [project?.id]);
 
+  // Load NPS over time data
+  const loadNpsOverTime = useCallback(async () => {
+    if (!project?.id) return;
+
+    setIsLoadingNpsOverTime(true);
+
+    try {
+      const response = await fetch(`/api/analytics/nps-over-time?project_id=${project.id}&period=${npsPeriod}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch NPS over time data');
+      }
+
+      const data = await response.json();
+      setNpsOverTime(data);
+    } catch (err) {
+      console.error('Error loading NPS over time:', err);
+      // Don't set global error, just log it
+    } finally {
+      setIsLoadingNpsOverTime(false);
+    }
+  }, [project?.id, npsPeriod]);
+
   // Load analytics when project is available
   useEffect(() => {
     if (project?.id) {
       loadAnalytics();
+      loadNpsOverTime();
     }
-  }, [project?.id, loadAnalytics]);
+  }, [project?.id, loadAnalytics, loadNpsOverTime]);
+
+  // Reload NPS over time when period changes
+  useEffect(() => {
+    if (project?.id) {
+      loadNpsOverTime();
+    }
+  }, [npsPeriod, project?.id, loadNpsOverTime]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -256,6 +307,16 @@ export default function AnalyticsPage() {
                 subtitle={`${analytics.feedbacksThisWeek} esta semana`}
                 icon={Calendar}
                 iconColor="#ffd700"
+              />
+            </div>
+
+            {/* NPS Over Time Chart */}
+            <div className="grid grid-cols-1 gap-6">
+              <NpsOverTimeChart 
+                data={npsOverTime?.data || []}
+                period={npsPeriod}
+                onPeriodChange={setNpsPeriod}
+                isLoading={isLoadingNpsOverTime}
               />
             </div>
 

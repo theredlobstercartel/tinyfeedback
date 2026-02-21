@@ -2,6 +2,12 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+interface ChartDataItem {
+  date: string;
+  count: number;
+  displayDate: string;
+}
+
 interface VolumeChartProps {
   data: { date: string; count: number }[];
 }
@@ -117,11 +123,12 @@ export function VolumeChart({ data }: VolumeChartProps) {
                 fontSize: '0.875rem',
               }}
               formatter={(value) => [`${value} feedbacks`, '']}
-              labelFormatter={(label, payload) => {
-                if (payload && payload[0]) {
-                  return formatFullDate(payload[0].payload.date);
+              labelFormatter={(_label, payload) => {
+                if (payload && payload[0] && payload[0].payload) {
+                  const p = payload[0].payload as ChartDataItem;
+                  return formatFullDate(p.date);
                 }
-                return label;
+                return String(_label);
               }}
               cursor={{ fill: 'rgba(0, 255, 136, 0.05)' }}
             />
