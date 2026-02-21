@@ -65,13 +65,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // For suggestion type, title is required (ST-07)
+    if (type === 'suggestion' && !title) {
+      return NextResponse.json(
+        { error: 'Title is required for suggestions' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
     // Create admin client to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify API key matches project
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, api_key, allowed_domains')
+      .select('id, api_key, allowed_domains, feedbacks_count, max_feedbacks')
       .eq('id', project_id)
       .single();
 
@@ -86,6 +94,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { error: 'Invalid API Key' },
         { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // Check feedback quota
+    if (project.feedbacks_count >= project.max_feedbacks) {
+      return NextResponse.json(
+        { error: 'Feedback quota exceeded for this project' },
+        { status: 429, headers: corsHeaders }
       );
     }
 
@@ -120,10 +136,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         project_id,
         type,
         nps_score: nps_score ?? null,
-        content: content || '',
+        content: content || 'No description provided',
         title: title || null,
         page_url: page_url || null,
-        user_agent: user_agent || null,
+        user_agent: user_agent || request.headers.get('user-agent') || null,
         user_email: user_email || null,
         user_id: user_id || null,
         screenshot_url: screenshot_url || null,
@@ -142,6 +158,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 500, headers: corsHeaders }
       );
     }
+
+    // Increment project feedback count
+    await supabase
+      .from('projects')
+      .update({ feedbacks_count: (project.feedbacks_count || 0) + 1 })
+      .eq('id', project_id);
 
     return NextResponse.json(
       { success: true, data: feedback },
