@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Mail, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
+import { login } from '@/lib/supabase/auth';
 
 const RATE_LIMIT_KEY = 'magic_link_requests';
 const MAX_REQUESTS = 5;
@@ -51,18 +54,22 @@ function incrementRateLimit(): void {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetInSeconds: number } | null>(null);
+  const [useMagicLink, setUseMagicLink] = useState(true);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setRateLimitInfo(null);
@@ -70,11 +77,25 @@ export default function LoginPage() {
     // Validate email
     if (!email.trim()) {
       setError('Por favor, insira seu email');
+      toast.error('Por favor, insira seu email', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
       return;
     }
 
     if (!validateEmail(email)) {
       setError('Por favor, insira um email válido');
+      toast.error('Por favor, insira um email válido', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
       return;
     }
 
@@ -83,6 +104,13 @@ export default function LoginPage() {
     if (!rateLimit.allowed) {
       setRateLimitInfo({ remaining: 0, resetInSeconds: rateLimit.resetInSeconds });
       setError(`Muitas tentativas. Aguarde ${rateLimit.resetInSeconds} segundos.`);
+      toast.error(`Muitas tentativas. Aguarde ${rateLimit.resetInSeconds} segundos.`, {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
       return;
     }
 
@@ -108,9 +136,102 @@ export default function LoginPage() {
         resetInSeconds: 60 
       });
       setIsSuccess(true);
+      
+      // Toast de sucesso
+      toast.success('Magic link enviado!', {
+        description: `Verifique sua caixa de entrada em ${email}`,
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #00ff88',
+          color: '#00ff88',
+        },
+      });
     } catch (err) {
       console.error('Error sending magic link:', err);
       setError('Erro ao enviar o link. Tente novamente mais tarde.');
+      toast.error('Erro ao enviar o link. Tente novamente mais tarde.', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate email
+    if (!email.trim()) {
+      setError('Por favor, insira seu email');
+      toast.error('Por favor, insira seu email', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setError('Por favor, insira um email válido');
+      toast.error('Por favor, insira um email válido', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('Por favor, insira sua senha');
+      toast.error('Por favor, insira sua senha', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await login({ email, password });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao fazer login');
+      }
+
+      toast.success('Login realizado com sucesso!', {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #00ff88',
+          color: '#00ff88',
+        },
+      });
+
+      router.push('/dashboard');
+      router.refresh();
+    } catch (err) {
+      console.error('Error logging in:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.';
+      setError(errorMessage);
+      toast.error(errorMessage, {
+        style: {
+          background: '#0a0a0a',
+          border: '1px solid #ff4444',
+          color: '#ff4444',
+        },
+      });
     } finally {
       setIsLoading(false);
     }
@@ -138,7 +259,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Success State */}
+        {/* Success State (Magic Link) */}
         {isSuccess ? (
           <div className="space-y-4 text-center">
             <div className="flex justify-center">
@@ -186,110 +307,203 @@ export default function LoginPage() {
             )}
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email Input */}
-            <div className="space-y-2">
-              <label 
-                htmlFor="email" 
-                className="block text-sm font-medium"
-                style={{ color: '#888888' }}
-              >
-                Email
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Mail size={18} style={{ color: '#888888' }} />
-                </div>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="founder@startup.com"
-                  disabled={isLoading}
-                  className="w-full py-3 pl-10 pr-4 transition-colors"
-                  style={{
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #222222',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#00ff88';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#222222';
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div 
-                className="p-3 text-sm"
-                style={{ 
-                  backgroundColor: 'rgba(255, 68, 68, 0.1)', 
-                  color: '#ff4444',
-                  border: '1px solid #ff4444'
+          <>
+            {/* Toggle between Magic Link and Password */}
+            <div className="flex gap-2 p-1" style={{ backgroundColor: '#000000', borderRadius: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setUseMagicLink(true)}
+                className="flex-1 py-2 text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: useMagicLink ? '#00ff88' : 'transparent',
+                  color: useMagicLink ? '#000000' : '#888888',
+                  borderRadius: '4px',
                 }}
               >
-                {error}
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 font-medium flex items-center justify-center gap-2 transition-colors"
-              style={{
-                backgroundColor: isLoading ? '#1a1a1a' : '#00ff88',
-                color: '#000000',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = '#00ffaa';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = '#00ff88';
-                }
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  Continuar
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-
-            {/* Help Text */}
-            <p 
-              className="text-center text-sm"
-              style={{ color: '#666666' }}
-            >
-              Não precisa de senha. Usamos links mágicos seguros.
-            </p>
-
-            {/* Rate Limit Info */}
-            {rateLimitInfo && rateLimitInfo.remaining > 0 && (
-              <p 
-                className="text-center text-xs"
-                style={{ color: '#555555' }}
+                Magic Link
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseMagicLink(false)}
+                className="flex-1 py-2 text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: !useMagicLink ? '#00ff88' : 'transparent',
+                  color: !useMagicLink ? '#000000' : '#888888',
+                  borderRadius: '4px',
+                }}
               >
-                {rateLimitInfo.remaining} tentativas restantes
+                Senha
+              </button>
+            </div>
+
+            <form onSubmit={useMagicLink ? handleMagicLinkSubmit : handlePasswordSubmit} className="space-y-4">
+              {/* Email Input */}
+              <div className="space-y-2">
+                <label 
+                  htmlFor="email" 
+                  className="block text-sm font-medium"
+                  style={{ color: '#888888' }}
+                >
+                  Email
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <Mail size={18} style={{ color: '#888888' }} />
+                  </div>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="founder@startup.com"
+                    disabled={isLoading}
+                    className="w-full py-3 pl-10 pr-4 transition-colors"
+                    style={{
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #222222',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#00ff88';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#222222';
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Password Input (only for password login) */}
+              {!useMagicLink && (
+                <div className="space-y-2">
+                  <label 
+                    htmlFor="password" 
+                    className="block text-sm font-medium"
+                    style={{ color: '#888888' }}
+                  >
+                    Senha
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Lock size={18} style={{ color: '#888888' }} />
+                    </div>
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      disabled={isLoading}
+                      className="w-full py-3 pl-10 pr-12 transition-colors"
+                      style={{
+                        backgroundColor: '#000000',
+                        color: '#ffffff',
+                        border: '1px solid #222222',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#00ff88';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#222222';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      style={{ color: '#888888' }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && (
+                <div 
+                  className="p-3 text-sm"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 68, 68, 0.1)', 
+                    color: '#ff4444',
+                    border: '1px solid #ff4444'
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 font-medium flex items-center justify-center gap-2 transition-colors"
+                style={{
+                  backgroundColor: isLoading ? '#1a1a1a' : '#00ff88',
+                  color: '#000000',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.7 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.backgroundColor = '#00ffaa';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.backgroundColor = '#00ff88';
+                  }
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    {useMagicLink ? 'Enviando...' : 'Entrando...'}
+                  </>
+                ) : (
+                  <>
+                    {useMagicLink ? 'Continuar' : 'Entrar'}
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+
+              {/* Help Text */}
+              {useMagicLink && (
+                <p 
+                  className="text-center text-sm"
+                  style={{ color: '#666666' }}
+                >
+                  Não precisa de senha. Usamos links mágicos seguros.
+                </p>
+              )}
+
+              {/* Signup Link */}
+              <p 
+                className="text-center text-sm"
+                style={{ color: '#666666' }}
+              >
+                Ainda não tem conta?{' '}
+                <a 
+                  href="/signup" 
+                  style={{ color: '#00ff88' }}
+                  className="hover:underline"
+                >
+                  Cadastre-se
+                </a>
               </p>
-            )}
-          </form>
+
+              {/* Rate Limit Info */}
+              {rateLimitInfo && rateLimitInfo.remaining > 0 && (
+                <p 
+                  className="text-center text-xs"
+                  style={{ color: '#555555' }}
+                >
+                  {rateLimitInfo.remaining} tentativas restantes
+                </p>
+              )}
+            </form>
+          </>
         )}
       </div>
     </div>

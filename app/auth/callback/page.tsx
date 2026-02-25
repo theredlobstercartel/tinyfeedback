@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, AlertCircle, Mail } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -24,8 +25,20 @@ export default function AuthCallbackPage() {
 
         if (session) {
           // User is authenticated, redirect to dashboard
-          router.push('/dashboard');
-          router.refresh();
+          toast.success('Login realizado com sucesso!', {
+            description: 'Redirecionando para o dashboard...',
+            style: {
+              background: '#0a0a0a',
+              border: '1px solid #00ff88',
+              color: '#00ff88',
+            },
+          });
+          
+          // Pequeno delay para o toast ser visível
+          setTimeout(() => {
+            router.push('/dashboard');
+            router.refresh();
+          }, 1000);
         } else {
           // Check if there's an error in the URL hash
           const hash = window.location.hash;
@@ -36,17 +49,49 @@ export default function AuthCallbackPage() {
             
             if (errorCode === 'access_denied' || errorDescription?.includes('expired')) {
               setError('link_expired');
+              toast.error('Link expirado', {
+                description: 'Este link mágico expirou. Solicite um novo.',
+                style: {
+                  background: '#0a0a0a',
+                  border: '1px solid #ff4444',
+                  color: '#ff4444',
+                },
+              });
             } else {
               setError(errorDescription || 'Erro desconhecido');
+              toast.error('Erro na autenticação', {
+                description: errorDescription || 'Erro desconhecido',
+                style: {
+                  background: '#0a0a0a',
+                  border: '1px solid #ff4444',
+                  color: '#ff4444',
+                },
+              });
             }
           } else {
             // No session and no error - might be a direct visit
             setError('invalid_link');
+            toast.error('Link inválido', {
+              description: 'Este link não é válido ou já foi usado.',
+              style: {
+                background: '#0a0a0a',
+                border: '1px solid #ff4444',
+                color: '#ff4444',
+              },
+            });
           }
         }
       } catch (err) {
         console.error('Auth callback error:', err);
         setError('process_error');
+        toast.error('Erro ao processar autenticação', {
+          description: 'Ocorreu um erro inesperado. Tente novamente.',
+          style: {
+            background: '#0a0a0a',
+            border: '1px solid #ff4444',
+            color: '#ff4444',
+          },
+        });
       } finally {
         setIsLoading(false);
       }
