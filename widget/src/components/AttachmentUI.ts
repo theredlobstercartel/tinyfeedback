@@ -1,12 +1,13 @@
 /**
  * Attachment UI Component for TinyFeedback Widget
  * Story: ST-06 - Widget Screenshot e Anexos
+ * Story: ST-12: UX Polish - Animações e Acessibilidade
  * 
- * Provides UI for:
- * - Screenshot capture button
- * - File upload button
- * - Attachment preview grid
- * - Remove attachment functionality
+ * Features:
+ * - Smooth animations with reduced motion support
+ * - WCAG 2.1 AA compliance
+ * - Keyboard navigation
+ * - Screen reader support
  */
 
 import { AttachmentHandler, AttachmentFile } from '../utils/AttachmentHandler.js';
@@ -18,6 +19,7 @@ export interface AttachmentUIOptions {
   projectId: string;
   onAttachmentsChange?: (attachments: AttachmentFile[]) => void;
   maxAttachments?: number;
+  reducedMotion?: boolean;
 }
 
 export class AttachmentUI {
@@ -33,6 +35,7 @@ export class AttachmentUI {
     this.options = {
       maxAttachments: 5,
       onAttachmentsChange: () => {},
+      reducedMotion: false,
       ...options
     };
     
@@ -44,6 +47,7 @@ export class AttachmentUI {
         this.renderAttachments();
         this.options.onAttachmentsChange(attachments);
         this.updateButtonStates();
+        this.announceAttachmentsChange(attachments.length);
       }
     });
     
@@ -71,7 +75,8 @@ export class AttachmentUI {
     const screenshotBtn = document.createElement('button');
     screenshotBtn.type = 'button';
     screenshotBtn.className = 'tf-attachment-btn tf-screenshot-btn';
-    screenshotBtn.innerHTML = '📸 Capturar Tela';
+    screenshotBtn.innerHTML = '<span aria-hidden="true">📸</span> Capturar Tela';
+    screenshotBtn.setAttribute('aria-label', 'Capturar screenshot da tela');
     screenshotBtn.style.cssText = this.getButtonStyles();
     screenshotBtn.addEventListener('click', () => this.handleScreenshot());
 
@@ -79,21 +84,26 @@ export class AttachmentUI {
     const uploadBtn = document.createElement('button');
     uploadBtn.type = 'button';
     uploadBtn.className = 'tf-attachment-btn tf-upload-btn';
-    uploadBtn.innerHTML = '📎 Anexar Arquivo';
+    uploadBtn.innerHTML = '<span aria-hidden="true">📎</span> Anexar Arquivo';
+    uploadBtn.setAttribute('aria-label', 'Anexar arquivo do computador');
     uploadBtn.style.cssText = this.getButtonStyles();
     uploadBtn.addEventListener('click', () => this.handler.triggerFileUpload());
 
     this.buttonsContainer.appendChild(screenshotBtn);
     this.buttonsContainer.appendChild(uploadBtn);
 
-    // Error message container
+    // Error message container (role="alert" for accessibility)
     this.errorMessage = document.createElement('div');
+    this.errorMessage.setAttribute('role', 'alert');
+    this.errorMessage.setAttribute('aria-live', 'polite');
     this.errorMessage.style.cssText = this.getErrorStyles();
     this.errorMessage.style.display = 'none';
 
     // Attachments preview container
     this.attachmentContainer = document.createElement('div');
     this.attachmentContainer.className = 'tf-attachment-grid';
+    this.attachmentContainer.setAttribute('role', 'list');
+    this.attachmentContainer.setAttribute('aria-label', 'Anexos adicionados');
     this.attachmentContainer.style.cssText = this.getAttachmentGridStyles();
 
     wrapper.appendChild(label);
@@ -118,7 +128,8 @@ export class AttachmentUI {
     const btn = this.buttonsContainer?.querySelector('.tf-screenshot-btn') as HTMLButtonElement;
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Capturando...';
+      btn.innerHTML = '<span aria-hidden="true">⏳</span> Capturando...';
+      btn.setAttribute('aria-busy', 'true');
     }
 
     try {
@@ -128,6 +139,7 @@ export class AttachmentUI {
         this.handler.getAttachments().push(attachment);
         this.renderAttachments();
         this.options.onAttachmentsChange(this.handler.getAttachments());
+        this.announce(`Screenshot capturado: ${attachment.name}`);
       } else {
         this.showError('Não foi possível capturar a tela. Tente anexar um arquivo manualmente.');
       }
@@ -136,7 +148,8 @@ export class AttachmentUI {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '📸 Capturar Tela';
+        btn.setAttribute('aria-busy', 'false');
+        btn.innerHTML = '<span aria-hidden="true">📸</span> Capturar Tela';
       }
       this.updateButtonStates();
     }
@@ -152,8 +165,8 @@ export class AttachmentUI {
     
     const attachments = this.handler.getAttachments();
     
-    attachments.forEach(attachment => {
-      const item = this.createAttachmentItem(attachment);
+    attachments.forEach((attachment, index) => {
+      const item = this.createAttachmentItem(attachment, index);
       this.attachmentContainer!.appendChild(item);
     });
   }
@@ -161,9 +174,10 @@ export class AttachmentUI {
   /**
    * Create attachment preview item
    */
-  private createAttachmentItem(attachment: AttachmentFile): HTMLElement {
+  private createAttachmentItem(attachment: AttachmentFile, index: number): HTMLElement {
     const item = document.createElement('div');
     item.className = 'tf-attachment-item';
+    item.setAttribute('role', 'listitem');
     item.style.cssText = this.getAttachmentItemStyles();
     item.dataset.id = attachment.id;
 
@@ -191,10 +205,12 @@ export class AttachmentUI {
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.innerHTML = '×';
+    removeBtn.setAttribute('aria-label', `Remover anexo ${attachment.name}`);
     removeBtn.style.cssText = this.getRemoveButtonStyles();
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.handler.removeAttachment(attachment.id);
+      this.announce(`Anexo ${attachment.name} removido`);
     });
 
     overlay.appendChild(nameLabel);
@@ -203,6 +219,11 @@ export class AttachmentUI {
 
     item.appendChild(img);
     item.appendChild(overlay);
+
+    // Animation for new items
+    if (!this.options.reducedMotion) {
+      item.style.animation = 'tf-attachment-appear 0.3s ease-out';
+    }
 
     return item;
   }
@@ -218,7 +239,35 @@ export class AttachmentUI {
       (btn as HTMLButtonElement).disabled = isFull;
       (btn as HTMLButtonElement).style.opacity = isFull ? '0.5' : '1';
       (btn as HTMLButtonElement).style.cursor = isFull ? 'not-allowed' : 'pointer';
+      
+      if (isFull) {
+        btn.setAttribute('aria-disabled', 'true');
+        btn.setAttribute('title', `Limite de ${this.options.maxAttachments} anexos atingido`);
+      } else {
+        btn.removeAttribute('aria-disabled');
+        btn.removeAttribute('title');
+      }
     });
+  }
+
+  /**
+   * Announce attachment changes to screen readers
+   */
+  private announceAttachmentsChange(count: number): void {
+    const message = count === 0 
+      ? 'Nenhum anexo' 
+      : `${count} anexo${count > 1 ? 's' : ''} adicionado${count > 1 ? 's' : ''}`;
+    
+    // Create temporary live region if not exists
+    let liveRegion = document.getElementById('tf-attachment-live');
+    if (!liveRegion) {
+      liveRegion = document.createElement('div');
+      liveRegion.id = 'tf-attachment-live';
+      liveRegion.setAttribute('aria-live', 'polite');
+      liveRegion.className = 'visually-hidden';
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = message;
   }
 
   /**
@@ -273,6 +322,9 @@ export class AttachmentUI {
    */
   public destroy(): void {
     this.handler.destroy();
+    // Clean up live region
+    const liveRegion = document.getElementById('tf-attachment-live');
+    liveRegion?.remove();
   }
 
   // ==================== STYLES ====================
@@ -313,11 +365,12 @@ export class AttachmentUI {
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all ${this.options.reducedMotion ? '0s' : '0.2s'} ease;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
+      outline-offset: 2px;
     `;
   }
 
@@ -408,7 +461,8 @@ export class AttachmentUI {
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background 0.2s ease;
+      transition: background ${this.options.reducedMotion ? '0s' : '0.2s'} ease;
+      outline-offset: 2px;
     `;
   }
 }

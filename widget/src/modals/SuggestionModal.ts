@@ -2,6 +2,13 @@
  * Suggestion Modal Component with Attachments
  * Story: ST-07 - Implementar Modal de Sugestão
  * Story: ST-06 - Widget Screenshot e Anexos
+ * Story: ST-12: UX Polish - Animações e Acessibilidade
+ * 
+ * Features:
+ * - Smooth animations with reduced motion support
+ * - WCAG 2.1 AA compliance
+ * - Keyboard navigation
+ * - Screen reader support
  */
 
 import { AttachmentUI, AttachmentFile } from '../components/AttachmentUI.js';
@@ -12,14 +19,18 @@ export interface SuggestionModalOptions {
   apiUrl: string;
   onClose?: () => void;
   onSubmit?: (title: string, description: string | undefined, attachments: string[]) => void;
+  reducedMotion?: boolean;
 }
 
 export class SuggestionModal {
   private container: HTMLElement | null = null;
+  private modalContent: HTMLElement | null = null;
   private options: SuggestionModalOptions;
   private titleInput: HTMLInputElement | null = null;
   private descriptionTextarea: HTMLTextAreaElement | null = null;
   private attachmentUI: AttachmentUI | null = null;
+  private previouslyFocusedElement: Element | null = null;
+  private isSubmitting: boolean = false;
 
   constructor(options: SuggestionModalOptions) {
     this.options = options;
@@ -29,10 +40,11 @@ export class SuggestionModal {
    * Open the Suggestion modal
    */
   public open(): void {
+    this.previouslyFocusedElement = document.activeElement;
     this.createModal();
     this.attachEventListeners();
     // Focus on title input after opening
-    setTimeout(() => this.titleInput?.focus(), 100);
+    setTimeout(() => this.titleInput?.focus(), this.options.reducedMotion ? 0 : 100);
   }
 
   /**
@@ -40,11 +52,40 @@ export class SuggestionModal {
    */
   public close(): void {
     if (this.container) {
-      this.container.remove();
-      this.container = null;
+      // Animate out
+      if (!this.options.reducedMotion) {
+        this.container.style.opacity = '0';
+        this.modalContent?.style.setProperty('transform', 'scale(0.95)');
+        
+        setTimeout(() => {
+          this.cleanup();
+        }, 200);
+      } else {
+        this.cleanup();
+      }
+    } else {
+      this.cleanup();
     }
+  }
+
+  /**
+   * Clean up resources
+   */
+  private cleanup(): void {
+    this.container?.remove();
+    this.container = null;
+    this.modalContent = null;
     this.attachmentUI?.destroy();
     this.attachmentUI = null;
+    
+    // Remove event listeners
+    document.removeEventListener('keydown', this.handleKeydown);
+    
+    // Return focus
+    if (this.previouslyFocusedElement instanceof HTMLElement) {
+      setTimeout(() => this.previouslyFocusedElement?.focus(), 0);
+    }
+    
     this.options.onClose?.();
   }
 
@@ -55,78 +96,113 @@ export class SuggestionModal {
     // Create container
     this.container = document.createElement('div');
     this.container.id = 'tf-suggestion-modal';
+    this.container.setAttribute('role', 'dialog');
+    this.container.setAttribute('aria-modal', 'true');
+    this.container.setAttribute('aria-labelledby', 'tf-suggestion-title');
     this.container.style.cssText = this.getContainerStyles();
 
     // Create modal content
-    const modal = document.createElement('div');
-    modal.id = 'tf-suggestion-content';
-    modal.style.cssText = this.getModalStyles();
+    this.modalContent = document.createElement('div');
+    this.modalContent.id = 'tf-suggestion-content';
+    this.modalContent.style.cssText = this.getModalStyles();
 
     // Close button
     const closeButton = document.createElement('button');
     closeButton.id = 'tf-suggestion-close';
     closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', 'Fechar modal');
     closeButton.style.cssText = this.getCloseButtonStyles();
 
     // Header
     const header = document.createElement('div');
     header.style.cssText = this.getHeaderStyles();
     header.innerHTML = `
-      <h3 style="${this.getTitleStyles()}">💡 Sugestão de Feature</h3>
-      <p style="${this.getSubtitleStyles()}">Tem uma ideia para melhorar nosso produto? Conta pra gente!</p>
+      <h3 id="tf-suggestion-title" style="${this.getTitleStyles()}">
+        <span aria-hidden="true">💡</span> Sugestão de Feature
+      </h3>
+      <p id="tf-suggestion-description" style="${this.getSubtitleStyles()}">
+        Tem uma ideia para melhorar nosso produto? Conta pra gente!
+      </p>
     `;
 
     // Form container
     const formContainer = document.createElement('form');
     formContainer.id = 'tf-suggestion-form';
+    formContainer.setAttribute('aria-describedby', 'tf-suggestion-description');
     formContainer.style.cssText = this.getFormStyles();
+    formContainer.noValidate = true;
 
     // Title field (required)
     const titleGroup = document.createElement('div');
     titleGroup.style.cssText = this.getFieldGroupStyles();
     
     const titleLabel = document.createElement('label');
-    titleLabel.htmlFor = 'tf-suggestion-title';
+    titleLabel.htmlFor = 'tf-suggestion-title-input';
     titleLabel.style.cssText = this.getLabelStyles();
-    titleLabel.innerHTML = 'Título da sugestão <span style="color: #ff4444;">*</span>';
+    titleLabel.innerHTML = 'Título da sugestão <span style="color: #ff4444;" aria-label="obrigatório">*</span>';
     
     this.titleInput = document.createElement('input');
-    this.titleInput.id = 'tf-suggestion-title';
+    this.titleInput.id = 'tf-suggestion-title-input';
     this.titleInput.type = 'text';
     this.titleInput.placeholder = 'Ex: Adicionar modo escuro';
     this.titleInput.required = true;
+    this.titleInput.setAttribute('aria-required', 'true');
+    this.titleInput.setAttribute('aria-describedby', 'tf-suggestion-title-error');
     this.titleInput.style.cssText = this.getInputStyles();
+    this.titleInput.autocomplete = 'off';
+
+    const titleError = document.createElement('span');
+    titleError.id = 'tf-suggestion-title-error';
+    titleError.className = 'visually-hidden';
+    titleError.textContent = 'Título é obrigatório';
 
     titleGroup.appendChild(titleLabel);
     titleGroup.appendChild(this.titleInput);
+    titleGroup.appendChild(titleError);
 
     // Description field (optional)
     const descriptionGroup = document.createElement('div');
     descriptionGroup.style.cssText = this.getFieldGroupStyles();
     
     const descriptionLabel = document.createElement('label');
-    descriptionLabel.htmlFor = 'tf-suggestion-description';
+    descriptionLabel.htmlFor = 'tf-suggestion-description-input';
     descriptionLabel.style.cssText = this.getLabelStyles();
     descriptionLabel.textContent = 'Descrição (opcional)';
     
     this.descriptionTextarea = document.createElement('textarea');
-    this.descriptionTextarea.id = 'tf-suggestion-description';
+    this.descriptionTextarea.id = 'tf-suggestion-description-input';
     this.descriptionTextarea.placeholder = 'Descreva sua sugestão em detalhes...';
+    this.descriptionTextarea.setAttribute('aria-describedby', 'tf-suggestion-description-hint');
     this.descriptionTextarea.style.cssText = this.getTextareaStyles();
+
+    const descriptionHint = document.createElement('span');
+    descriptionHint.id = 'tf-suggestion-description-hint';
+    descriptionHint.className = 'visually-hidden';
+    descriptionHint.textContent = 'Campo opcional. Descreva sua ideia com mais detalhes.';
 
     descriptionGroup.appendChild(descriptionLabel);
     descriptionGroup.appendChild(this.descriptionTextarea);
+    descriptionGroup.appendChild(descriptionHint);
 
     // Attachment UI container
     const attachmentContainer = document.createElement('div');
     attachmentContainer.id = 'tf-suggestion-attachments';
+    attachmentContainer.setAttribute('aria-label', 'Anexos');
 
     // Submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'tf-suggestion-submit';
     submitButton.type = 'submit';
     submitButton.textContent = 'Enviar Sugestão';
+    submitButton.setAttribute('aria-live', 'polite');
     submitButton.style.cssText = this.getSubmitButtonStyles();
+
+    // Live region for announcements
+    const liveRegion = document.createElement('div');
+    liveRegion.id = 'tf-suggestion-live';
+    liveRegion.setAttribute('aria-live', 'polite');
+    liveRegion.setAttribute('aria-atomic', 'true');
+    liveRegion.className = 'visually-hidden';
 
     // Assemble form
     formContainer.appendChild(titleGroup);
@@ -135,10 +211,11 @@ export class SuggestionModal {
     formContainer.appendChild(submitButton);
 
     // Assemble modal
-    modal.appendChild(closeButton);
-    modal.appendChild(header);
-    modal.appendChild(formContainer);
-    this.container.appendChild(modal);
+    this.modalContent.appendChild(closeButton);
+    this.modalContent.appendChild(header);
+    this.modalContent.appendChild(formContainer);
+    this.modalContent.appendChild(liveRegion);
+    this.container.appendChild(this.modalContent);
 
     // Add to document
     document.body.appendChild(this.container);
@@ -149,8 +226,12 @@ export class SuggestionModal {
       apiUrl: this.options.apiUrl,
       apiKey: this.options.apiKey,
       projectId: this.options.projectId,
-      maxAttachments: 5
+      maxAttachments: 5,
+      reducedMotion: this.options.reducedMotion
     });
+    
+    // Add accessibility styles
+    this.addAccessibilityStyles();
   }
 
   /**
@@ -177,35 +258,97 @@ export class SuggestionModal {
       }
     });
 
-    // Close on Escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.container) {
-        this.close();
-      }
-    });
+    // Escape key
+    document.addEventListener('keydown', this.handleKeydown);
+    
+    // Focus trap
+    this.container.addEventListener('keydown', this.handleFocusTrap);
+  }
+
+  /**
+   * Handle global keydown events
+   */
+  private handleKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && this.container) {
+      e.preventDefault();
+      this.close();
+    }
+  };
+
+  /**
+   * Handle focus trap within modal
+   */
+  private handleFocusTrap = (e: KeyboardEvent): void => {
+    if (e.key !== 'Tab' || !this.container) return;
+    
+    const focusableElements = this.getFocusableElements();
+    if (focusableElements.length === 0) return;
+    
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    
+    if (e.shiftKey && document.activeElement === firstElement) {
+      e.preventDefault();
+      lastElement.focus();
+    } else if (!e.shiftKey && document.activeElement === lastElement) {
+      e.preventDefault();
+      firstElement.focus();
+    }
+  };
+
+  /**
+   * Get all focusable elements within the modal
+   */
+  private getFocusableElements(): HTMLElement[] {
+    if (!this.container) return [];
+    
+    const selector = [
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(', ');
+    
+    return Array.from(this.container.querySelectorAll(selector));
+  }
+
+  /**
+   * Announce message to screen readers
+   */
+  private announce(message: string): void {
+    const liveRegion = this.container?.querySelector('#tf-suggestion-live');
+    if (liveRegion) {
+      liveRegion.textContent = message;
+    }
   }
 
   /**
    * Submit the suggestion
    */
   private async submit(): Promise<void> {
-    if (!this.titleInput) return;
+    if (!this.titleInput || this.isSubmitting) return;
 
     const title = this.titleInput.value.trim();
     const description = this.descriptionTextarea?.value?.trim() || '';
 
-    // AC-01: Validate title is required
+    // Validate title is required
     if (!title) {
       this.showError('O título é obrigatório');
       this.titleInput?.focus();
+      this.titleInput?.setAttribute('aria-invalid', 'true');
       return;
     }
+    
+    this.titleInput?.setAttribute('aria-invalid', 'false');
+
+    this.isSubmitting = true;
 
     // Show loading state
     const submitBtn = this.container?.querySelector('#tf-suggestion-submit') as HTMLButtonElement;
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Enviando...';
+      submitBtn.setAttribute('aria-busy', 'true');
     }
 
     try {
@@ -217,6 +360,7 @@ export class SuggestionModal {
         
         if (errors.length > 0) {
           console.warn('[TinyFeedback] Some attachments failed:', errors);
+          this.announce(`${errors.length} anexo(s) falharam no envio`);
         }
         
         attachmentUrls = urls;
@@ -243,10 +387,8 @@ export class SuggestionModal {
       if (response.ok) {
         const data = await response.json();
         
-        // AC-02: Show warning if approaching limit
         if (data.warning) {
           this.showWarning(data.warning.message, data.warning.detail);
-          // Still close after showing warning briefly
           setTimeout(() => this.close(), 3000);
           return;
         }
@@ -254,7 +396,6 @@ export class SuggestionModal {
         this.showThankYou();
         this.options.onSubmit?.(title, description || undefined, attachmentUrls);
       } else if (response.status === 429) {
-        // AC-03: Handle limit reached
         const errorData = await response.json();
         if (errorData.error === 'LIMIT_REACHED') {
           this.showLimitReached(errorData.message);
@@ -269,9 +410,10 @@ export class SuggestionModal {
       console.error('Error submitting suggestion:', error);
       this.showError('Falha ao enviar sugestão. Tente novamente.');
     } finally {
+      this.isSubmitting = false;
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Enviar Sugestão';
+        submitBtn.setAttribute('aria-busy', 'false');
       }
     }
   }
@@ -281,12 +423,13 @@ export class SuggestionModal {
    */
   private showWarning(title: string, detail: string): void {
     if (!this.container) return;
+    this.announce(`Aviso: ${title}`);
 
     const modal = this.container.querySelector('#tf-suggestion-content');
     if (modal) {
       modal.innerHTML = `
-        <div style="${this.getWarningStyles()}">
-          <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+        <div style="${this.getWarningStyles()}" role="alert">
+          <div style="font-size: 48px; margin-bottom: 16px;" aria-hidden="true">⚠️</div>
           <h3 style="${this.getTitleStyles()}">${title}</h3>
           <p style="${this.getSubtitleStyles()}">${detail}</p>
         </div>
@@ -295,16 +438,17 @@ export class SuggestionModal {
   }
 
   /**
-   * Show limit reached message (AC-03)
+   * Show limit reached message
    */
   private showLimitReached(message: string): void {
     if (!this.container) return;
+    this.announce(`Limite atingido: ${message}`);
 
     const modal = this.container.querySelector('#tf-suggestion-content');
     if (modal) {
       modal.innerHTML = `
-        <div style="${this.getLimitReachedStyles()}">
-          <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+        <div style="${this.getLimitReachedStyles()}" role="alert">
+          <div style="font-size: 48px; margin-bottom: 16px;" aria-hidden="true">🚫</div>
           <h3 style="${this.getTitleStyles()}">Limite Atingido</h3>
           <p style="${this.getSubtitleStyles()}">${message}</p>
           <button 
@@ -317,7 +461,6 @@ export class SuggestionModal {
       `;
     }
 
-    // Auto close after 5 seconds
     setTimeout(() => this.close(), 5000);
   }
 
@@ -325,12 +468,14 @@ export class SuggestionModal {
    * Show error message
    */
   private showError(message: string): void {
-    // Remove any existing error
+    this.announce(`Erro: ${message}`);
+    
     const existingError = this.container?.querySelector('#tf-suggestion-error');
     existingError?.remove();
 
     const errorDiv = document.createElement('div');
     errorDiv.id = 'tf-suggestion-error';
+    errorDiv.setAttribute('role', 'alert');
     errorDiv.style.cssText = this.getErrorStyles();
     errorDiv.textContent = message;
 
@@ -343,25 +488,81 @@ export class SuggestionModal {
    */
   private showThankYou(): void {
     if (!this.container) return;
+    this.announce('Obrigado! Sua sugestão foi enviada com sucesso.');
 
     const modal = this.container.querySelector('#tf-suggestion-content');
     if (modal) {
       modal.innerHTML = `
-        <div style="${this.getThankYouStyles()}">
-          <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+        <div style="${this.getThankYouStyles()}" role="alert">
+          <div style="font-size: 48px; margin-bottom: 16px;" aria-hidden="true">🎉</div>
           <h3 style="${this.getTitleStyles()}">Obrigado!</h3>
           <p style="${this.getSubtitleStyles()}">Sua sugestão foi enviada com sucesso.</p>
         </div>
       `;
     }
 
-    // Auto close after 2 seconds
     setTimeout(() => this.close(), 2000);
+  }
+
+  /**
+   * Add accessibility styles
+   */
+  private addAccessibilityStyles(): void {
+    const styleId = 'tf-suggestion-a11y-styles';
+    if (document.getElementById(styleId)) return;
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      
+      /* Focus visible styles */
+      #tf-suggestion-content button:focus-visible,
+      #tf-suggestion-content input:focus-visible,
+      #tf-suggestion-content textarea:focus-visible {
+        outline: 3px solid #ffaa00;
+        outline-offset: 2px;
+      }
+      
+      /* Reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        #tf-suggestion-modal, #tf-suggestion-content {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      
+      /* High contrast mode */
+      @media (prefers-contrast: high) {
+        #tf-suggestion-content {
+          border: 2px solid currentColor !important;
+        }
+        #tf-suggestion-content input,
+        #tf-suggestion-content textarea {
+          border: 2px solid currentColor !important;
+        }
+      }
+    `;
+    document.head?.appendChild(style);
   }
 
   // ==================== STYLES ====================
 
   private getContainerStyles(): string {
+    const animation = this.options.reducedMotion 
+      ? '' 
+      : 'animation: tf-modal-appear 0.2s ease-out;';
+    
     return `
       position: fixed;
       top: 0;
@@ -369,11 +570,14 @@ export class SuggestionModal {
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 999999;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: opacity 0.2s ease;
+      ${animation}
     `;
   }
 
@@ -387,7 +591,8 @@ export class SuggestionModal {
       max-height: 90vh;
       overflow-y: auto;
       position: relative;
-      box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
+      box-shadow: 0 0 40px rgba(255, 170, 0, 0.1);
+      transition: transform 0.2s ease;
     `;
   }
 
@@ -407,7 +612,8 @@ export class SuggestionModal {
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: color 0.2s ease;
+      transition: color ${this.options.reducedMotion ? '0s' : '0.2s'} ease;
+      outline-offset: 2px;
     `;
   }
 
@@ -470,6 +676,7 @@ export class SuggestionModal {
       box-sizing: border-box;
       font-family: inherit;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      outline-offset: 2px;
     `;
   }
 
@@ -486,6 +693,7 @@ export class SuggestionModal {
       box-sizing: border-box;
       font-family: inherit;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      outline-offset: 2px;
     `;
   }
 
@@ -494,13 +702,14 @@ export class SuggestionModal {
       width: 100%;
       padding: 14px;
       margin-top: 8px;
-      background: #00ff88;
+      background: #ffaa00;
       color: #000;
       border: none;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all ${this.options.reducedMotion ? '0s' : '0.2s'} ease;
+      outline-offset: 2px;
     `;
   }
 
@@ -551,6 +760,7 @@ export class SuggestionModal {
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
+      outline-offset: 2px;
     `;
   }
 }
