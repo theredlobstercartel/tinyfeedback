@@ -1,14 +1,17 @@
 /**
- * Bug Report Modal Component
+ * Bug Report Modal Component with Attachments
  * Story: ST-05 - Criar Widget Vanilla JS
+ * Story: ST-06 - Widget Screenshot e Anexos
  */
+
+import { AttachmentUI, AttachmentFile } from '../components/AttachmentUI.js';
 
 export interface BugModalOptions {
   projectId: string;
   apiKey: string;
   apiUrl: string;
   onClose?: () => void;
-  onSubmit?: (title: string, description: string, severity: string) => void;
+  onSubmit?: (title: string, description: string, severity: string, attachments: string[]) => void;
 }
 
 type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -19,6 +22,7 @@ export class BugModal {
   private titleInput: HTMLInputElement | null = null;
   private descriptionTextarea: HTMLTextAreaElement | null = null;
   private selectedSeverity: BugSeverity = 'medium';
+  private attachmentUI: AttachmentUI | null = null;
 
   constructor(options: BugModalOptions) {
     this.options = options;
@@ -41,6 +45,8 @@ export class BugModal {
       this.container.remove();
       this.container = null;
     }
+    this.attachmentUI?.destroy();
+    this.attachmentUI = null;
     this.options.onClose?.();
   }
 
@@ -139,6 +145,10 @@ export class BugModal {
     descriptionGroup.appendChild(descriptionLabel);
     descriptionGroup.appendChild(this.descriptionTextarea);
 
+    // Attachment UI container
+    const attachmentContainer = document.createElement('div');
+    attachmentContainer.id = 'tf-bug-attachments';
+    
     // Submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'tf-bug-submit';
@@ -149,6 +159,7 @@ export class BugModal {
     formContainer.appendChild(severityGroup);
     formContainer.appendChild(titleGroup);
     formContainer.appendChild(descriptionGroup);
+    formContainer.appendChild(attachmentContainer);
     formContainer.appendChild(submitButton);
 
     modal.appendChild(closeButton);
@@ -157,6 +168,15 @@ export class BugModal {
     this.container.appendChild(modal);
 
     document.body.appendChild(this.container);
+
+    // Initialize Attachment UI after modal is in DOM
+    this.attachmentUI = new AttachmentUI({
+      container: attachmentContainer,
+      apiUrl: this.options.apiUrl,
+      apiKey: this.options.apiKey,
+      projectId: this.options.projectId,
+      maxAttachments: 5
+    });
   }
 
   /**
@@ -236,7 +256,27 @@ export class BugModal {
       return;
     }
 
+    // Show loading state
+    const submitBtn = this.container?.querySelector('#tf-bug-submit') as HTMLButtonElement;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+    }
+
     try {
+      // Upload attachments first if any
+      let attachmentUrls: string[] = [];
+      if (this.attachmentUI && this.attachmentUI.getAttachments().length > 0) {
+        const handler = this.attachmentUI.getHandler();
+        const { urls, errors } = await handler.uploadAttachments();
+        
+        if (errors.length > 0) {
+          console.warn('[TinyFeedback] Some attachments failed:', errors);
+        }
+        
+        attachmentUrls = urls;
+      }
+
       const response = await fetch(`${this.options.apiUrl}/api/widget/feedback`, {
         method: 'POST',
         headers: {
@@ -249,7 +289,9 @@ export class BugModal {
           title: title,
           content: `[${this.selectedSeverity.toUpperCase()}] ${description}`,
           page_url: window.location.href,
-          user_agent: navigator.userAgent
+          user_agent: navigator.userAgent,
+          screenshot_url: attachmentUrls.length > 0 ? attachmentUrls[0] : null,
+          attachment_urls: attachmentUrls
         })
       });
 
@@ -263,7 +305,7 @@ export class BugModal {
         }
         
         this.showThankYou();
-        this.options.onSubmit?.(title, description, this.selectedSeverity);
+        this.options.onSubmit?.(title, description, this.selectedSeverity, attachmentUrls);
       } else if (response.status === 429) {
         const errorData = await response.json();
         if (errorData.error === 'LIMIT_REACHED') {
@@ -281,6 +323,11 @@ export class BugModal {
     } catch (error) {
       console.error('Error submitting bug report:', error);
       this.showError('Falha ao enviar report. Tente novamente.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar Report';
+      }
     }
   }
 
@@ -372,6 +419,8 @@ export class BugModal {
       padding: 32px;
       max-width: 500px;
       width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
       position: relative;
       box-shadow: 0 0 40px rgba(255, 68, 68, 0.1);
     `;

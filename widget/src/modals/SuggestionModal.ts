@@ -1,14 +1,17 @@
 /**
- * Suggestion Modal Component
+ * Suggestion Modal Component with Attachments
  * Story: ST-07 - Implementar Modal de Sugestão
+ * Story: ST-06 - Widget Screenshot e Anexos
  */
+
+import { AttachmentUI, AttachmentFile } from '../components/AttachmentUI.js';
 
 export interface SuggestionModalOptions {
   projectId: string;
   apiKey: string;
   apiUrl: string;
   onClose?: () => void;
-  onSubmit?: (title: string, description?: string) => void;
+  onSubmit?: (title: string, description: string | undefined, attachments: string[]) => void;
 }
 
 export class SuggestionModal {
@@ -16,6 +19,7 @@ export class SuggestionModal {
   private options: SuggestionModalOptions;
   private titleInput: HTMLInputElement | null = null;
   private descriptionTextarea: HTMLTextAreaElement | null = null;
+  private attachmentUI: AttachmentUI | null = null;
 
   constructor(options: SuggestionModalOptions) {
     this.options = options;
@@ -39,6 +43,8 @@ export class SuggestionModal {
       this.container.remove();
       this.container = null;
     }
+    this.attachmentUI?.destroy();
+    this.attachmentUI = null;
     this.options.onClose?.();
   }
 
@@ -111,6 +117,10 @@ export class SuggestionModal {
     descriptionGroup.appendChild(descriptionLabel);
     descriptionGroup.appendChild(this.descriptionTextarea);
 
+    // Attachment UI container
+    const attachmentContainer = document.createElement('div');
+    attachmentContainer.id = 'tf-suggestion-attachments';
+
     // Submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'tf-suggestion-submit';
@@ -121,6 +131,7 @@ export class SuggestionModal {
     // Assemble form
     formContainer.appendChild(titleGroup);
     formContainer.appendChild(descriptionGroup);
+    formContainer.appendChild(attachmentContainer);
     formContainer.appendChild(submitButton);
 
     // Assemble modal
@@ -131,6 +142,15 @@ export class SuggestionModal {
 
     // Add to document
     document.body.appendChild(this.container);
+
+    // Initialize Attachment UI after modal is in DOM
+    this.attachmentUI = new AttachmentUI({
+      container: attachmentContainer,
+      apiUrl: this.options.apiUrl,
+      apiKey: this.options.apiKey,
+      projectId: this.options.projectId,
+      maxAttachments: 5
+    });
   }
 
   /**
@@ -181,7 +201,27 @@ export class SuggestionModal {
       return;
     }
 
+    // Show loading state
+    const submitBtn = this.container?.querySelector('#tf-suggestion-submit') as HTMLButtonElement;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+    }
+
     try {
+      // Upload attachments first if any
+      let attachmentUrls: string[] = [];
+      if (this.attachmentUI && this.attachmentUI.getAttachments().length > 0) {
+        const handler = this.attachmentUI.getHandler();
+        const { urls, errors } = await handler.uploadAttachments();
+        
+        if (errors.length > 0) {
+          console.warn('[TinyFeedback] Some attachments failed:', errors);
+        }
+        
+        attachmentUrls = urls;
+      }
+
       const response = await fetch(`${this.options.apiUrl}/api/widget/feedback`, {
         method: 'POST',
         headers: {
@@ -194,7 +234,9 @@ export class SuggestionModal {
           title: title,
           content: description,
           page_url: window.location.href,
-          user_agent: navigator.userAgent
+          user_agent: navigator.userAgent,
+          screenshot_url: attachmentUrls.length > 0 ? attachmentUrls[0] : null,
+          attachment_urls: attachmentUrls
         })
       });
 
@@ -210,7 +252,7 @@ export class SuggestionModal {
         }
         
         this.showThankYou();
-        this.options.onSubmit?.(title, description);
+        this.options.onSubmit?.(title, description || undefined, attachmentUrls);
       } else if (response.status === 429) {
         // AC-03: Handle limit reached
         const errorData = await response.json();
@@ -226,6 +268,11 @@ export class SuggestionModal {
     } catch (error) {
       console.error('Error submitting suggestion:', error);
       this.showError('Falha ao enviar sugestão. Tente novamente.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar Sugestão';
+      }
     }
   }
 
@@ -337,6 +384,8 @@ export class SuggestionModal {
       padding: 32px;
       max-width: 500px;
       width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
       position: relative;
       box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
     `;

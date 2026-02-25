@@ -72,6 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       user_email,
       user_id,
       screenshot_url,
+      attachment_urls,
       title
     } = body;
 
@@ -96,6 +97,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { error: 'Title is required for suggestions' },
         { status: 400, headers: corsHeaders }
       );
+    }
+
+    // For bug type, title is also recommended
+    if (type === 'bug' && !title) {
+      return NextResponse.json(
+        { error: 'Title is required for bug reports' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Validate attachment_urls if provided
+    let validatedAttachmentUrls: string[] | null = null;
+    if (attachment_urls && Array.isArray(attachment_urls) && attachment_urls.length > 0) {
+      // Validate URLs (basic validation)
+      validatedAttachmentUrls = attachment_urls.filter(url => 
+        typeof url === 'string' && 
+        (url.startsWith('http://') || url.startsWith('https://'))
+      );
+      
+      // Limit to max 5 attachments
+      if (validatedAttachmentUrls.length > 5) {
+        validatedAttachmentUrls = validatedAttachmentUrls.slice(0, 5);
+      }
     }
 
     // Create admin client to bypass RLS
@@ -173,6 +197,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           user_email: user_email || null,
           user_id: user_id || null,
           screenshot_url: screenshot_url || null,
+          attachment_urls: validatedAttachmentUrls,
           status: 'new',
           response_sent: false,
           internal_notes: null,
@@ -270,6 +295,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         user_email: user_email || null,
         user_id: user_id || null,
         screenshot_url: screenshot_url || null,
+        attachment_urls: validatedAttachmentUrls,
         status: 'new',
         response_sent: false,
         internal_notes: null,
