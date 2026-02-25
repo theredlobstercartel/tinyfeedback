@@ -14,7 +14,7 @@ Object.defineProperty(window, 'localStorage', {
 })
 
 // Mock window.location and navigator
-defineProperty(window, 'location', {
+Object.defineProperty(window, 'location', {
   value: {
     href: 'https://example.com/page',
     pathname: '/page',
