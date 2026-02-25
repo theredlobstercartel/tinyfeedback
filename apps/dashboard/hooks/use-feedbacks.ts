@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
   listFeedbacks,
   getFeedbackStats,
+  getUnreadCount,
   updateFeedbackStatus,
   deleteFeedback,
   batchUpdateStatus,
@@ -11,7 +12,7 @@ import {
   ListFeedbacksOptions,
   ListFeedbacksResult,
 } from '@/lib/dashboard-feedback-service'
-import { FeedbackStats, FeedbackFilters } from '@/types/dashboard-feedback'
+import { FeedbackStats, FeedbackFilters, FeedbackStatus } from '@/types/dashboard-feedback'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,6 +26,7 @@ export const feedbackKeys = {
   lists: () => [...feedbackKeys.all, 'list'] as const,
   list: (filters: ListFeedbacksOptions) => [...feedbackKeys.lists(), filters] as const,
   stats: (projectId: string) => [...feedbackKeys.all, 'stats', projectId] as const,
+  unread: (projectId: string) => [...feedbackKeys.all, 'unread', projectId] as const,
 }
 
 // Hook for fetching feedbacks with pagination and filters
@@ -45,11 +47,24 @@ export function useFeedbackStats(projectId: string, queryOptions?: Omit<UseQuery
   })
 }
 
-// Hook for realtime updates
+// Hook for fetching unread count
+export function useUnreadCount(projectId: string, queryOptions?: Omit<UseQueryOptions<number, Error>, 'queryKey' | 'queryFn'>) {
+  return useQuery({
+    queryKey: feedbackKeys.unread(projectId),
+    queryFn: () => getUnreadCount(projectId),
+    ...queryOptions,
+  })
+}
+
+// Hook for realtime updates with unread count
 export function useRealtimeFeedbacks(projectId: string, onUpdate?: () => void) {
   const queryClient = useQueryClient()
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
+    // Initial fetch of unread count
+    getUnreadCount(projectId).then(setUnreadCount).catch(console.error)
+
     const channel = supabase
       .channel('feedbacks_changes')
       .on(
@@ -66,6 +81,9 @@ export function useRealtimeFeedbacks(projectId: string, onUpdate?: () => void) {
           // Invalidate all feedback queries
           queryClient.invalidateQueries({ queryKey: feedbackKeys.all })
           
+          // Update unread count
+          getUnreadCount(projectId).then(setUnreadCount).catch(console.error)
+          
           // Call optional callback
           onUpdate?.()
         }
@@ -76,6 +94,53 @@ export function useRealtimeFeedbacks(projectId: string, onUpdate?: () => void) {
       channel.unsubscribe()
     }
   }, [projectId, queryClient, onUpdate])
+
+  return { unreadCount }
+}
+
+// Hook for keyboard shortcuts
+export function useFeedbackKeyboardShortcuts({
+  onMarkAsRead,
+  onArchive,
+  selectedFeedbackId,
+  isModalOpen,
+}: {
+  onMarkAsRead?: (id: string) => void
+  onArchive?: (id: string) => void
+  selectedFeedbackId?: string | null
+  isModalOpen?: boolean
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs or when modal is open
+      if (
+        isModalOpen ||
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
+      ) {
+        return
+      }
+
+      // Only trigger if we have a selected feedback
+      if (!selectedFeedbackId) return
+
+      const key = event.key.toLowerCase()
+
+      if (key === 'e' && onArchive) {
+        event.preventDefault()
+        onArchive(selectedFeedbackId)
+      }
+
+      if (key === 'm' && onMarkAsRead) {
+        event.preventDefault()
+        onMarkAsRead(selectedFeedbackId)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onMarkAsRead, onArchive, selectedFeedbackId, isModalOpen])
 }
 
 // Mutation hooks
@@ -83,7 +148,7 @@ export function useUpdateFeedbackStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ feedbackId, status }: { feedbackId: string; status: 'new' | 'analyzing' | 'implemented' | 'archived' }) =>
+    mutationFn: ({ feedbackId, status }: { feedbackId: string; status: FeedbackStatus }) =>
       updateFeedbackStatus(feedbackId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: feedbackKeys.all })
@@ -106,7 +171,7 @@ export function useBatchUpdateStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ feedbackIds, status }: { feedbackIds: string[]; status: 'new' | 'analyzing' | 'implemented' | 'archived' }) =>
+    mutationFn: ({ feedbackIds, status }: { feedbackIds: string[]; status: FeedbackStatus }) =>
       batchUpdateStatus(feedbackIds, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: feedbackKeys.all })

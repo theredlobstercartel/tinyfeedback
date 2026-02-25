@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,19 +23,18 @@ import {
   Trash2,
   Mail,
   User,
-  ExternalLink,
-  Monitor,
   CheckCircle2,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  X,
   Image as ImageIcon,
+  Monitor,
+  RotateCcw,
+  MailOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { FeedbackItem } from '@/types/dashboard-feedback'
-import { FeedbackFilters } from '@/types/dashboard-feedback'
+import { FeedbackItem, FeedbackStatus } from '@/types/dashboard-feedback'
 
 // Types
 interface FeedbackTableProps {
@@ -53,10 +52,12 @@ interface FeedbackTableProps {
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
   onView: (feedback: FeedbackItem) => void
-  onStatusChange: (id: string, status: 'new' | 'analyzing' | 'implemented' | 'archived') => void
+  onStatusChange: (id: string, status: FeedbackStatus) => void
   onMarkAsRead: (id: string) => void
   onArchive: (id: string) => void
+  onRestore?: (id: string) => void
   onDelete: (id: string) => void
+  archivingIds?: Set<string>
 }
 
 // Configurations
@@ -66,11 +67,12 @@ const typeConfig = {
   bug: { icon: Bug, label: 'Bug', color: 'bg-red-100 text-red-700' },
 }
 
-const statusConfig = {
-  new: { label: 'Novo', variant: 'default' as const, color: 'bg-blue-100 text-blue-700' },
-  analyzing: { label: 'Em análise', variant: 'warning' as const, color: 'bg-yellow-100 text-yellow-700' },
-  implemented: { label: 'Implementado', variant: 'success' as const, color: 'bg-green-100 text-green-700' },
-  archived: { label: 'Arquivado', variant: 'secondary' as const, color: 'bg-gray-100 text-gray-700' },
+const statusConfig: Record<FeedbackStatus, { label: string; variant: 'default' | 'warning' | 'success' | 'secondary' | 'destructive' | 'outline'; color: string }> = {
+  new: { label: 'Novo', variant: 'default', color: 'bg-blue-100 text-blue-700' },
+  read: { label: 'Lido', variant: 'secondary', color: 'bg-indigo-100 text-indigo-700' },
+  analyzing: { label: 'Em análise', variant: 'warning', color: 'bg-yellow-100 text-yellow-700' },
+  implemented: { label: 'Implementado', variant: 'success', color: 'bg-green-100 text-green-700' },
+  archived: { label: 'Arquivado', variant: 'secondary', color: 'bg-gray-100 text-gray-700' },
 }
 
 const priorityConfig = {
@@ -181,7 +183,9 @@ export function FeedbackTableV2({
   onStatusChange,
   onMarkAsRead,
   onArchive,
+  onRestore,
   onDelete,
+  archivingIds = new Set(),
 }: FeedbackTableProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
@@ -193,7 +197,11 @@ export function FeedbackTableV2({
         <input
           type="checkbox"
           checked={table.getIsAllPageRowsSelected()}
-          indeterminate={table.getIsSomePageRowsSelected()}
+          ref={(el) => {
+            if (el) {
+              el.indeterminate = table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+            }
+          }}
           onChange={table.getToggleAllPageRowsSelectedHandler()}
           className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
@@ -226,20 +234,24 @@ export function FeedbackTableV2({
       cell: ({ row }) => {
         const type = row.original.type
         const TypeIcon = typeConfig[type].icon
+        const isNew = row.original.status === 'new'
         return (
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className={cn('p-1.5 rounded-lg', typeConfig[type].color)}>
-                <TypeIcon className="w-4 h-4" />
-              </span>
+          <div className="flex items-center gap-2">
+            <span className={cn('p-1.5 rounded-lg', typeConfig[type].color)}>
+              <TypeIcon className="w-4 h-4" />
+            </span>
+            <div className="flex flex-col">
               <span className="text-sm font-medium text-gray-900">
                 {typeConfig[type].label}
               </span>
+              {row.original.priority && row.original.type === 'bug' && (
+                <span className={cn('text-xs mt-0.5 px-2 py-0.5 rounded w-fit', priorityConfig[row.original.priority].color)}>
+                  {priorityConfig[row.original.priority].label}
+                </span>
+              )}
             </div>
-            {row.original.priority && row.original.type === 'bug' && (
-              <span className={cn('text-xs mt-1 px-2 py-0.5 rounded w-fit', priorityConfig[row.original.priority].color)}>
-                {priorityConfig[row.original.priority].label}
-              </span>
+            {isNew && (
+              <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" title="Novo" />
             )}
           </div>
         )
@@ -253,13 +265,14 @@ export function FeedbackTableV2({
       cell: ({ row }) => {
         const feedback = row.original
         const content = getFeedbackContent(feedback)
+        const isNew = feedback.status === 'new'
         return (
-          <div className="max-w-xs">
-            <p className="text-sm font-medium text-gray-900 truncate">
+          <div className={cn('max-w-xs', isNew && 'font-medium')}>
+            <p className="text-sm text-gray-900 truncate">
               {getFeedbackSummary(feedback)}
             </p>
             {content && (
-              <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">
+              <p className={cn('text-sm line-clamp-2 mt-0.5', isNew ? 'text-gray-700' : 'text-gray-500')}>
                 {content}
               </p>
             )}
@@ -365,6 +378,8 @@ export function FeedbackTableV2({
       cell: ({ row }) => {
         const feedback = row.original
         const isMenuOpen = openMenuId === feedback.id
+        const isArchiving = archivingIds.has(feedback.id)
+        const isArchived = feedback.status === 'archived'
 
         return (
           <div className="relative">
@@ -381,7 +396,7 @@ export function FeedbackTableV2({
                   className="fixed inset-0 z-10"
                   onClick={() => setOpenMenuId(null)}
                 />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 animate-in fade-in zoom-in-95 duration-150">
                   <button
                     onClick={() => {
                       onView(feedback)
@@ -393,10 +408,23 @@ export function FeedbackTableV2({
                     Ver detalhes
                   </button>
                   
-                  {feedback.status === 'new' && (
+                  {!isArchived && feedback.status === 'new' && (
                     <button
                       onClick={() => {
                         onMarkAsRead(feedback.id)
+                        setOpenMenuId(null)
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <MailOpen className="w-4 h-4" />
+                      Marcar como lido
+                    </button>
+                  )}
+                  
+                  {!isArchived && feedback.status !== 'read' && (
+                    <button
+                      onClick={() => {
+                        onStatusChange(feedback.id, 'read')
                         setOpenMenuId(null)
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -406,7 +434,7 @@ export function FeedbackTableV2({
                     </button>
                   )}
                   
-                  {feedback.status !== 'analyzing' && (
+                  {!isArchived && feedback.status !== 'analyzing' && (
                     <button
                       onClick={() => {
                         onStatusChange(feedback.id, 'analyzing')
@@ -414,12 +442,12 @@ export function FeedbackTableV2({
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <CheckCircle2 className="w-4 h-4" />
                       Em análise
                     </button>
                   )}
                   
-                  {feedback.status !== 'implemented' && (
+                  {!isArchived && feedback.status !== 'implemented' && (
                     <button
                       onClick={() => {
                         onStatusChange(feedback.id, 'implemented')
@@ -432,18 +460,30 @@ export function FeedbackTableV2({
                     </button>
                   )}
                   
-                  {feedback.status !== 'archived' && (
+                  {!isArchived ? (
                     <button
                       onClick={() => {
                         onArchive(feedback.id)
                         setOpenMenuId(null)
                       }}
+                      disabled={isArchiving}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Archive className={cn('w-4 h-4', isArchiving && 'animate-spin')} />
+                      {isArchiving ? 'Arquivando...' : 'Arquivar'}
+                    </button>
+                  ) : onRestore ? (
+                    <button
+                      onClick={() => {
+                        onRestore(feedback.id)
+                        setOpenMenuId(null)
+                      }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      <Archive className="w-4 h-4" />
-                      Arquivar
+                      <RotateCcw className="w-4 h-4" />
+                      Restaurar
                     </button>
-                  )}
+                  ) : null}
                   
                   <hr className="my-1 border-gray-200" />
                   
@@ -465,7 +505,7 @@ export function FeedbackTableV2({
       },
       size: 80,
     }),
-  ], [onView, onStatusChange, onMarkAsRead, onArchive, onDelete, openMenuId])
+  ], [onView, onStatusChange, onMarkAsRead, onArchive, onRestore, onDelete, openMenuId, archivingIds])
 
   const table = useReactTable({
     data: feedbacks,
@@ -546,21 +586,29 @@ export function FeedbackTableV2({
             ))}
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {table.getRowModel().rows.map(row => (
-              <tr
-                key={row.id}
-                className={cn(
-                  'hover:bg-gray-50 transition-colors',
-                  row.getIsSelected() && 'bg-blue-50/50'
-                )}
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="px-4 py-3">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map(row => {
+              const isArchiving = archivingIds.has(row.original.id)
+              const isArchived = row.original.status === 'archived'
+              
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    'hover:bg-gray-50 transition-all duration-200',
+                    row.getIsSelected() && 'bg-blue-50/50',
+                    isArchiving && 'opacity-50 scale-[0.98]',
+                    isArchived && 'bg-gray-50/50',
+                    row.original.status === 'new' && 'bg-blue-50/30'
+                  )}
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className="px-4 py-3">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

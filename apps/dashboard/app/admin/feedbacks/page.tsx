@@ -9,7 +9,8 @@ import { FeedbackDetailModal } from '@/components/feedback-detail-modal'
 import { StatsCards } from '@/components/stats-cards'
 import { Pagination } from '@/components/ui/pagination'
 import { BatchActions } from '@/components/batch-actions'
-import { FeedbackItem, FeedbackFilters } from '@/types/dashboard-feedback'
+import { BatchConfirmDialog } from '@/components/batch-confirm-dialog'
+import { FeedbackItem, FeedbackFilters, FeedbackStatus } from '@/types/dashboard-feedback'
 import {
   useFeedbacks,
   useFeedbackStats,
@@ -18,6 +19,7 @@ import {
   useDeleteFeedback,
   useBatchUpdateStatus,
   useBatchDelete,
+  useFeedbackKeyboardShortcuts,
 } from '@/hooks/use-feedbacks'
 import { toast } from 'sonner'
 
@@ -31,6 +33,8 @@ export default function FeedbacksPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [viewingFeedback, setViewingFeedback] = useState<FeedbackItem | null>(null)
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set())
+  const [batchConfirmAction, setBatchConfirmAction] = useState<'archive' | 'delete' | 'markAsRead' | null>(null)
   
   // Filters state
   const [filters, setFilters] = useState<FeedbackFilters>({
@@ -41,7 +45,12 @@ export default function FeedbacksPage() {
   // Convert sorting to filters format
   const listOptions = useMemo(() => {
     const sortColumn = sorting[0]?.id || 'created_at'
-    const sortOrder = sorting[0]?.desc ? 'desc' : 'asc'
+    const sortOrder = (sorting[0]?.desc ? 'desc' : 'asc') as 'asc' | 'desc'
+    
+    // Handle showUnreadOnly filter
+    const effectiveStatus = filters.showUnreadOnly 
+      ? undefined // Will be handled by filtering new and read in the query
+      : filters.status
     
     return {
       projectId: PROJECT_ID,
@@ -49,6 +58,7 @@ export default function FeedbacksPage() {
       limit: PAGE_SIZE,
       filters: {
         ...filters,
+        status: effectiveStatus,
         sortBy: sortColumn as FeedbackFilters['sortBy'],
         sortOrder,
       },
@@ -80,22 +90,13 @@ export default function FeedbacksPage() {
       .filter(Boolean) as string[]
   }, [rowSelection, feedbacksData])
 
-  // Calculate adjacent feedbacks for navigation
-  const adjacentFeedbacks = useMemo(() => {
-    if (!viewingFeedback || !feedbacksData?.data) {
-      return { prev: null, next: null }
-    }
-    
-    const currentIndex = feedbacksData.data.findIndex(f => f.id === viewingFeedback.id)
-    if (currentIndex === -1) {
-      return { prev: null, next: null }
-    }
-    
-    return {
-      prev: currentIndex > 0 ? feedbacksData.data[currentIndex - 1] : null,
-      next: currentIndex < feedbacksData.data.length - 1 ? feedbacksData.data[currentIndex + 1] : null,
-    }
-  }, [viewingFeedback, feedbacksData])
+  // Keyboard shortcuts
+  useFeedbackKeyboardShortcuts({
+    onMarkAsRead: (id) => handleMarkAsRead(id),
+    onArchive: (id) => handleArchive(id),
+    selectedFeedbackId: viewingFeedback?.id,
+    isModalOpen: !!viewingFeedback,
+  })
 
   // Handlers
   const handleFiltersChange = useCallback((newFilters: FeedbackFilters) => {
@@ -105,11 +106,29 @@ export default function FeedbacksPage() {
 
   const handleStatusChange = useCallback(async (
     id: string, 
-    status: 'new' | 'analyzing' | 'implemented' | 'archived'
+    status: FeedbackStatus
   ) => {
     try {
       await updateStatusMutation.mutateAsync({ feedbackId: id, status })
-      toast.success(`Status atualizado para ${getStatusLabel(status)}`)
+      const statusLabels: Record<FeedbackStatus, string> = {
+        new: 'Novo',
+        read: 'Lido',
+        analyzing: 'Em análise',
+        implemented: 'Implementado',
+        archived: 'Arquivado',
+      }
+      
+      // Show toast with undo button for archive action
+      if (status === 'archived') {
+        toast.success(`Feedback arquivado`, {
+          action: {
+            label: 'Desfazer',
+            onClick: () => handleStatusChange(id, 'new'),
+          },
+        })
+      } else {
+        toast.success(`Status atualizado para ${statusLabels[status]}`)
+      }
     } catch (error) {
       toast.error('Erro ao atualizar status')
     }
@@ -117,19 +136,40 @@ export default function FeedbacksPage() {
 
   const handleMarkAsRead = useCallback(async (id: string) => {
     try {
-      await updateStatusMutation.mutateAsync({ feedbackId: id, status: 'analyzing' })
-      toast.success('Marcado como lido')
+      await updateStatusMutation.mutateAsync({ feedbackId: id, status: 'read' })
+      // Silent update - no toast for auto-read
     } catch (error) {
-      toast.error('Erro ao marcar como lido')
+      console.error('Erro ao marcar como lido:', error)
     }
   }, [updateStatusMutation])
 
   const handleArchive = useCallback(async (id: string) => {
+    setArchivingIds(prev => new Set(prev).add(id))
     try {
       await updateStatusMutation.mutateAsync({ feedbackId: id, status: 'archived' })
-      toast.success('Feedback arquivado')
+      toast.success('Feedback arquivado', {
+        action: {
+          label: 'Desfazer',
+          onClick: () => handleStatusChange(id, 'new'),
+        },
+      })
     } catch (error) {
       toast.error('Erro ao arquivar')
+    } finally {
+      setArchivingIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [updateStatusMutation, handleStatusChange])
+
+  const handleRestore = useCallback(async (id: string) => {
+    try {
+      await updateStatusMutation.mutateAsync({ feedbackId: id, status: 'new' })
+      toast.success('Feedback restaurado')
+    } catch (error) {
+      toast.error('Erro ao restaurar')
     }
   }, [updateStatusMutation])
 
@@ -144,52 +184,52 @@ export default function FeedbacksPage() {
     }
   }, [deleteMutation])
 
-  const handleBatchArchive = useCallback(async () => {
-    try {
-      await batchUpdateMutation.mutateAsync({ feedbackIds: selectedIds, status: 'archived' })
-      setRowSelection({})
-      toast.success(`${selectedIds.length} feedback(s) arquivado(s)`)
-    } catch (error) {
-      toast.error('Erro ao arquivar em lote')
-    }
-  }, [selectedIds, batchUpdateMutation])
+  // Batch handlers with confirmation
+  const handleBatchArchive = useCallback(() => {
+    setBatchConfirmAction('archive')
+  }, [])
 
-  const handleBatchDelete = useCallback(async () => {
-    if (!confirm(`Tem certeza que deseja deletar ${selectedIds.length} feedback(s)?`)) return
-    
-    try {
-      await batchDeleteMutation.mutateAsync(selectedIds)
-      setRowSelection({})
-      toast.success(`${selectedIds.length} feedback(s) deletado(s)`)
-    } catch (error) {
-      toast.error('Erro ao deletar em lote')
-    }
-  }, [selectedIds, batchDeleteMutation])
+  const handleBatchDelete = useCallback(() => {
+    setBatchConfirmAction('delete')
+  }, [])
 
-  const handleBatchMarkAsAnalyzing = useCallback(async () => {
-    try {
-      await batchUpdateMutation.mutateAsync({ feedbackIds: selectedIds, status: 'analyzing' })
-      setRowSelection({})
-      toast.success(`${selectedIds.length} feedback(s) marcado(s) como em análise`)
-    } catch (error) {
-      toast.error('Erro ao atualizar em lote')
-    }
-  }, [selectedIds, batchUpdateMutation])
+  const handleBatchMarkAsRead = useCallback(() => {
+    setBatchConfirmAction('markAsRead')
+  }, [])
 
-  const handleModalStatusChange = useCallback(async (status: 'new' | 'analyzing' | 'implemented' | 'archived') => {
+  const handleConfirmBatchAction = useCallback(async () => {
+    if (!batchConfirmAction || selectedIds.length === 0) return
+
+    try {
+      if (batchConfirmAction === 'delete') {
+        await batchDeleteMutation.mutateAsync(selectedIds)
+        toast.success(`${selectedIds.length} feedback(s) deletado(s)`)
+      } else if (batchConfirmAction === 'archive') {
+        await batchUpdateMutation.mutateAsync({ feedbackIds: selectedIds, status: 'archived' })
+        toast.success(`${selectedIds.length} feedback(s) arquivado(s)`, {
+          action: {
+            label: 'Desfazer',
+            onClick: () => batchUpdateMutation.mutateAsync({ feedbackIds: selectedIds, status: 'new' }),
+          },
+        })
+      } else if (batchConfirmAction === 'markAsRead') {
+        await batchUpdateMutation.mutateAsync({ feedbackIds: selectedIds, status: 'read' })
+        toast.success(`${selectedIds.length} feedback(s) marcado(s) como lido(s)`)
+      }
+      setRowSelection({})
+    } catch (error) {
+      toast.error('Erro ao executar ação em lote')
+    } finally {
+      setBatchConfirmAction(null)
+    }
+  }, [batchConfirmAction, selectedIds, batchDeleteMutation, batchUpdateMutation])
+
+  const handleModalStatusChange = useCallback(async (status: FeedbackStatus) => {
     if (viewingFeedback) {
       await handleStatusChange(viewingFeedback.id, status)
       setViewingFeedback(null)
     }
   }, [viewingFeedback, handleStatusChange])
-
-  // Handle navigation between feedbacks
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
-    const target = direction === 'prev' ? adjacentFeedbacks.prev : adjacentFeedbacks.next
-    if (target) {
-      setViewingFeedback(target)
-    }
-  }, [adjacentFeedbacks])
 
   // Show error state
   if (error) {
@@ -220,10 +260,16 @@ export default function FeedbacksPage() {
             <h1 className="text-2xl font-bold text-gray-900">Feedbacks</h1>
             <p className="text-gray-500 mt-1">Gerencie todos os feedbacks recebidos</p>
           </div>
+          <div className="text-sm text-gray-500">
+            <span className="hidden sm:inline">Atalhos: </span>
+            <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">E</kbd> Arquivar
+            <span className="mx-2">•</span>
+            <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">M</kbd> Marcar lido
+          </div>
         </div>
 
         {/* Stats Cards */}
-        <StatsCards stats={stats || { total: 0, new: 0, analyzing: 0, implemented: 0, archived: 0 }} isLoading={!stats} />
+        <StatsCards stats={stats || { total: 0, new: 0, read: 0, analyzing: 0, implemented: 0, archived: 0 }} isLoading={!stats} />
 
         {/* Filters */}
         <FeedbackFiltersPanel
@@ -250,7 +296,9 @@ export default function FeedbacksPage() {
           onStatusChange={handleStatusChange}
           onMarkAsRead={handleMarkAsRead}
           onArchive={handleArchive}
+          onRestore={handleRestore}
           onDelete={handleDelete}
+          archivingIds={archivingIds}
         />
 
         {/* Pagination */}
@@ -270,8 +318,17 @@ export default function FeedbacksPage() {
         selectedCount={selectedIds.length}
         onArchive={handleBatchArchive}
         onDelete={handleBatchDelete}
-        onMarkAsAnalyzing={handleBatchMarkAsAnalyzing}
+        onMarkAsRead={handleBatchMarkAsRead}
         onClear={() => setRowSelection({})}
+      />
+
+      {/* Batch Confirm Dialog */}
+      <BatchConfirmDialog
+        isOpen={!!batchConfirmAction}
+        onClose={() => setBatchConfirmAction(null)}
+        onConfirm={handleConfirmBatchAction}
+        action={batchConfirmAction || 'archive'}
+        count={selectedIds.length}
       />
 
       {/* Detail Modal */}
@@ -280,19 +337,8 @@ export default function FeedbacksPage() {
         isOpen={!!viewingFeedback}
         onClose={() => setViewingFeedback(null)}
         onStatusChange={handleModalStatusChange}
-        onNavigate={handleNavigate}
-        adjacentFeedbacks={adjacentFeedbacks}
+        onMarkAsRead={handleMarkAsRead}
       />
     </DashboardLayout>
   )
-}
-
-function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    new: 'Novo',
-    analyzing: 'Em análise',
-    implemented: 'Implementado',
-    archived: 'Arquivado',
-  }
-  return labels[status] || status
 }

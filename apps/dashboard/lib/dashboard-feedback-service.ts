@@ -39,7 +39,10 @@ export async function listFeedbacks({
   }
 
   // Apply status filter
-  if (filters.status && filters.status !== 'all') {
+  if (filters.showUnreadOnly) {
+    // Show only new and read (not archived, analyzing, or implemented)
+    query = query.in('status', ['new', 'read'])
+  } else if (filters.status && filters.status !== 'all') {
     query = query.eq('status', filters.status)
   }
 
@@ -186,6 +189,22 @@ export async function batchDelete(feedbackIds: string[]): Promise<void> {
     console.error('Error batch deleting feedbacks:', error)
     throw new Error('Failed to delete feedbacks')
   }
+}
+
+// Get unread count (new feedbacks)
+export async function getUnreadCount(projectId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('feedbacks')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .eq('status', 'new')
+
+  if (error) {
+    console.error('Error fetching unread count:', error)
+    throw new Error('Failed to fetch unread count')
+  }
+
+  return count || 0
 }
 
 // Optimized query for large datasets - uses cursor-based pagination
