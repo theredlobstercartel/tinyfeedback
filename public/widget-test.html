@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TinyFeedback Widget Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    h2 {
+      font-size: 1.5rem;
+      margin: 2rem 0 1rem;
+      color: #00ff88;
+    }
+    
+    p {
+      line-height: 1.6;
+      margin-bottom: 1rem;
+      color: #ccc;
+    }
+    
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 20px 0;
+    }
+    
+    code {
+      background: rgba(0,0,0,0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.9em;
+    }
+    
+    pre {
+      background: #0a0a0a;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+    
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    
+    .highlight {
+      color: #00ff88;
+    }
+    
+    .test-button {
+      background: #00ff88;
+      color: #0a0a0a;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    
+    .test-button:hover {
+      filter: brightness(1.1);
+    }
+    
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      padding-top: 40px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🦞 <span class="highlight">TinyFeedback</span> Widget Test</h1>
+    
+    <div class="card">
+      <h2>Como usar</h2>
+      <p>Adicione o script abaixo ao seu HTML:</p>
+      
+      <pre><code>&lt;script 
+  src="./widget.js" 
+  data-widget-key="tf_SUA_API_KEY">&lt;/script></code></pre>
+      
+      <p>O botão de feedback será renderizado automaticamente na posição configurada.</p>
+    </div>
+    
+    <div class="card">
+      <h2>Features</h2>
+      <ul style="color: #ccc; line-height: 2;">
+        <li>✅ <strong>Vanilla JS</strong> - Sem dependências</li>
+        <li>✅ <strong>Shadow DOM</strong> - Isolamento de estilos</li>
+        <li>✅ <strong>Cyber-neon</strong> - Design futurista</li>
+        <li>✅ <strong>Sharp corners</strong> - border-radius: 0</li>
+        <li>✅ <strong>Posições</strong> - bottom-right, bottom-left, top-right, top-left</li>
+        <li>✅ <strong>NPS + Feedback</strong> - Avaliação completa</li>
+      </ul>
+    </div>
+    
+    <div class="card">
+      <h2>Teste Manual</h2>
+      <p>Se o widget estiver carregado corretamente, você verá um botão flutuante 
+      com ícone de chat no canto da tela.</p>
+      
+      <button class="test-button" onclick="testWidget()">Testar Widget Programaticamente</button>
+    </div>
+    
+    <footer>
+      <p>TinyFeedback - Widget de feedback ultra-leve para SaaS</p>
+    </footer>
+  </div>
+
+  <script>
+    function testWidget() {
+      if (window.TinyFeedback) {
+        console.log('TinyFeedback disponível:', window.TinyFeedback);
+        alert('✅ Widget carregado com sucesso!\n\nVerifique o console para mais detalhes.');
+      } else {
+        alert('❌ Widget não encontrado.\n\nVerifique se o script foi carregado corretamente.');
+      }
+    }
+  </script>
+  
+  <!-- TinyFeedback Widget -->
+  <script src="./widget.js" data-widget-key="tf_test_key"></script>
+</body>
+</html>

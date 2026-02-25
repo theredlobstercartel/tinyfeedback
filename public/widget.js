@@ -1,19 +1,39 @@
 /**
- * TinyFeedback Widget - Vanilla JavaScript
- * Embeddable feedback widget for SaaS products
+ * TinyFeedback Widget - Embeddable Feedback Widget
+ * Vanilla JavaScript, no dependencies
+ * Cyber-neon aesthetic with sharp corners (border-radius: 0)
+ * 
+ * Usage:
+ * <script src="https://tinyfeedback.vercel.app/widget.js" data-widget-key="tf_YOUR_API_KEY"></script>
  */
 (function() {
   'use strict';
 
-  // Widget configuration
+  // Auto-detect API URL from script source
+  function getApiUrl() {
+    const scripts = document.querySelectorAll('script[src*="widget.js"]');
+    for (const script of scripts) {
+      const src = script.src;
+      if (src) {
+        try {
+          const url = new URL(src);
+          return `${url.protocol}//${url.host}`;
+        } catch (e) {
+          // Fallback
+        }
+      }
+    }
+    return 'https://tinyfeedback.vercel.app';
+  }
+
   const CONFIG = {
-    apiUrl: 'https://tinyfeedback.vercel.app',
+    apiUrl: getApiUrl(),
     defaultPosition: 'bottom-right',
     defaultColor: '#00ff88',
   };
 
-  // Current widget instance
-  let widgetInstance = null;
+  // Active widget instances
+  const widgetInstances = new Map();
 
   /**
    * TinyFeedback Widget Class
@@ -21,7 +41,8 @@
   class TinyFeedbackWidget {
     constructor(config) {
       this.config = {
-        widgetKey: config.widgetKey,
+        projectId: config.project_id,
+        apiKey: config.api_key,
         position: config.position || CONFIG.defaultPosition,
         primaryColor: config.primaryColor || CONFIG.defaultColor,
         title: config.title || 'Queremos seu feedback!',
@@ -36,6 +57,7 @@
       this.currentStep = 1;
       this.selectedNps = null;
       this.feedbackType = null;
+      this.feedbackTitle = '';
       
       this.init();
     }
@@ -55,13 +77,13 @@
      */
     createShadowDOM() {
       this.host = document.createElement('div');
-      this.host.id = 'tinyfeedback-widget-host';
+      this.host.id = `tinyfeedback-widget-host-${Date.now()}`;
       this.shadow = this.host.attachShadow({ mode: 'open' });
       document.body.appendChild(this.host);
     }
 
     /**
-     * Inject CSS styles
+     * Inject CSS styles - Cyber-neon aesthetic with sharp corners
      */
     injectStyles() {
       const styles = `
@@ -69,8 +91,10 @@
           box-sizing: border-box;
           margin: 0;
           padding: 0;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
+        /* Floating Button */
         .tf-widget-button {
           position: fixed;
           ${this.getPositionStyles()}
@@ -78,40 +102,54 @@
           height: 56px;
           border-radius: 0;
           background: ${this.config.primaryColor};
-          border: none;
+          border: 2px solid ${this.config.primaryColor};
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 20px ${this.config.primaryColor}40;
+          box-shadow: 
+            0 4px 20px rgba(0,0,0,0.5),
+            0 0 30px ${this.config.primaryColor}40,
+            inset 0 0 20px rgba(255,255,255,0.1);
           transition: all 0.2s ease;
-          z-index: 999999;
+          z-index: 2147483647;
         }
         
         .tf-widget-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.5), 0 0 30px ${this.config.primaryColor}60;
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 
+            0 6px 30px rgba(0,0,0,0.6),
+            0 0 50px ${this.config.primaryColor}60,
+            inset 0 0 30px rgba(255,255,255,0.2);
+          background: ${this.lightenColor(this.config.primaryColor, 10)};
+        }
+        
+        .tf-widget-button:active {
+          transform: translateY(0) scale(1);
         }
         
         .tf-widget-button svg {
           width: 24px;
           height: 24px;
           color: #0a0a0a;
+          filter: drop-shadow(0 0 4px rgba(0,0,0,0.3));
         }
         
+        /* Modal Overlay */
         .tf-modal-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0,0,0,0.8);
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(4px);
           display: none;
           align-items: center;
           justify-content: center;
-          z-index: 9999999;
+          z-index: 2147483647;
           opacity: 0;
-          transition: opacity 0.2s ease;
+          transition: opacity 0.25s ease;
         }
         
         .tf-modal-overlay.active {
@@ -119,43 +157,48 @@
           opacity: 1;
         }
         
+        /* Modal Container */
         .tf-modal {
-          background: #141414;
-          border: 1px solid #333;
+          background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
+          border: 1px solid ${this.config.primaryColor}40;
           border-radius: 0;
           width: 100%;
           max-width: 480px;
           max-height: 90vh;
           overflow-y: auto;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-          transform: scale(0.95);
-          transition: transform 0.2s ease;
+          box-shadow: 
+            0 25px 50px rgba(0,0,0,0.8),
+            0 0 60px ${this.config.primaryColor}20,
+            inset 0 1px 0 rgba(255,255,255,0.05);
+          transform: scale(0.95) translateY(10px);
+          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         
         .tf-modal-overlay.active .tf-modal {
-          transform: scale(1);
+          transform: scale(1) translateY(0);
         }
         
+        /* Modal Header */
         .tf-modal-header {
           padding: 24px 24px 16px;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid ${this.config.primaryColor}30;
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
+          background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
         }
         
         .tf-modal-title {
           color: #fff;
           font-size: 20px;
           font-weight: 600;
-          font-family: Inter, system-ui, sans-serif;
           margin: 0;
+          text-shadow: 0 0 20px ${this.config.primaryColor}40;
         }
         
         .tf-modal-subtitle {
-          color: #a0a0a0;
+          color: #888;
           font-size: 14px;
-          font-family: Inter, system-ui, sans-serif;
           margin-top: 4px;
         }
         
@@ -168,22 +211,34 @@
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: color 0.2s;
+          transition: all 0.2s;
+          border-radius: 0;
         }
         
         .tf-close-btn:hover {
-          color: #fff;
+          color: ${this.config.primaryColor};
+          transform: rotate(90deg);
         }
         
+        /* Modal Body */
         .tf-modal-body {
           padding: 24px;
         }
         
+        /* Step Labels */
+        .tf-step-label {
+          color: #888;
+          font-size: 14px;
+          margin-bottom: 16px;
+        }
+        
+        /* NPS Scale */
         .tf-nps-scale {
           display: flex;
-          gap: 8px;
+          gap: 6px;
           justify-content: center;
           margin: 16px 0;
+          flex-wrap: wrap;
         }
         
         .tf-nps-btn {
@@ -192,34 +247,39 @@
           border: 1px solid #333;
           background: #0a0a0a;
           color: #fff;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.15s;
           display: flex;
           align-items: center;
           justify-content: center;
+          border-radius: 0;
         }
         
         .tf-nps-btn:hover {
           border-color: ${this.config.primaryColor};
           background: #1a1a1a;
+          box-shadow: 0 0 10px ${this.config.primaryColor}30;
         }
         
         .tf-nps-btn.selected {
           background: ${this.config.primaryColor};
           border-color: ${this.config.primaryColor};
           color: #0a0a0a;
+          font-weight: 600;
+          box-shadow: 0 0 20px ${this.config.primaryColor}50;
         }
         
         .tf-nps-labels {
           display: flex;
           justify-content: space-between;
-          color: #666;
+          color: #555;
           font-size: 12px;
-          font-family: Inter, system-ui, sans-serif;
+          margin-top: 8px;
         }
         
+        /* Type Buttons */
         .tf-type-buttons {
           display: flex;
           gap: 12px;
@@ -228,31 +288,39 @@
         
         .tf-type-btn {
           flex: 1;
-          padding: 12px;
+          padding: 16px 12px;
           border: 1px solid #333;
-          background: #0a0a0a;
+          background: linear-gradient(145deg, #0f0f0f 0%, #0a0a0a 100%);
           color: #fff;
           cursor: pointer;
-          font-family: Inter, system-ui, sans-serif;
           font-size: 14px;
           transition: all 0.15s;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 8px;
+          border-radius: 0;
         }
         
         .tf-type-btn:hover {
-          border-color: ${this.config.primaryColor};
-          background: #1a1a1a;
+          border-color: ${this.config.primaryColor}60;
+          background: linear-gradient(145deg, #1a1a1a 0%, #0f0f0f 100%);
+          box-shadow: 0 0 20px ${this.config.primaryColor}20;
         }
         
         .tf-type-btn.selected {
           background: ${this.config.primaryColor};
           border-color: ${this.config.primaryColor};
           color: #0a0a0a;
+          font-weight: 600;
+          box-shadow: 0 0 30px ${this.config.primaryColor}40;
         }
         
+        .tf-type-btn.selected svg {
+          color: #0a0a0a;
+        }
+        
+        /* Textarea */
         .tf-textarea {
           width: 100%;
           min-height: 120px;
@@ -260,44 +328,76 @@
           border: 1px solid #333;
           background: #0a0a0a;
           color: #fff;
-          font-family: Inter, system-ui, sans-serif;
           font-size: 14px;
           resize: vertical;
           margin: 16px 0;
+          border-radius: 0;
+          transition: all 0.2s;
         }
         
         .tf-textarea:focus {
           outline: none;
           border-color: ${this.config.primaryColor};
+          box-shadow: 0 0 15px ${this.config.primaryColor}20, inset 0 0 10px rgba(0,0,0,0.5);
         }
         
         .tf-textarea::placeholder {
-          color: #666;
+          color: #555;
         }
         
+        /* Title Input */
+        .tf-title-input {
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #333;
+          background: #0a0a0a;
+          color: #fff;
+          font-size: 14px;
+          margin-bottom: 12px;
+          border-radius: 0;
+          transition: all 0.2s;
+        }
+        
+        .tf-title-input:focus {
+          outline: none;
+          border-color: ${this.config.primaryColor};
+          box-shadow: 0 0 15px ${this.config.primaryColor}20;
+        }
+        
+        .tf-title-input::placeholder {
+          color: #555;
+        }
+        
+        /* Submit Button */
         .tf-submit-btn {
           width: 100%;
           padding: 14px;
           background: ${this.config.primaryColor};
-          border: none;
+          border: 2px solid ${this.config.primaryColor};
           color: #0a0a0a;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
-          font-family: Inter, system-ui, sans-serif;
           cursor: pointer;
-          transition: all 0.15s;
+          transition: all 0.2s;
+          border-radius: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          box-shadow: 0 4px 15px ${this.config.primaryColor}30;
         }
         
-        .tf-submit-btn:hover {
+        .tf-submit-btn:hover:not(:disabled) {
           filter: brightness(1.1);
-          box-shadow: 0 0 20px ${this.config.primaryColor}40;
+          box-shadow: 0 6px 25px ${this.config.primaryColor}50;
+          transform: translateY(-1px);
         }
         
         .tf-submit-btn:disabled {
-          opacity: 0.5;
+          opacity: 0.4;
           cursor: not-allowed;
+          filter: grayscale(0.5);
         }
         
+        /* Success State */
         .tf-success {
           text-align: center;
           padding: 48px 24px;
@@ -307,31 +407,91 @@
           width: 64px;
           height: 64px;
           color: ${this.config.primaryColor};
-          margin: 0 auto 16px;
+          margin: 0 auto 20px;
+          filter: drop-shadow(0 0 20px ${this.config.primaryColor}50);
+          animation: tf-pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes tf-pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
         }
         
         .tf-success-title {
           color: #fff;
           font-size: 24px;
           font-weight: 600;
-          font-family: Inter, system-ui, sans-serif;
           margin-bottom: 8px;
+          text-shadow: 0 0 20px ${this.config.primaryColor}30;
         }
         
         .tf-success-message {
-          color: #a0a0a0;
-          font-size: 16px;
-          font-family: Inter, system-ui, sans-serif;
+          color: #888;
+          font-size: 15px;
+          line-height: 1.5;
         }
         
+        /* Hidden utility */
         .tf-hidden {
           display: none !important;
+        }
+        
+        /* Scrollbar styling */
+        .tf-modal::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        .tf-modal::-webkit-scrollbar-track {
+          background: #0a0a0a;
+        }
+        
+        .tf-modal::-webkit-scrollbar-thumb {
+          background: #333;
+          border-radius: 0;
+        }
+        
+        .tf-modal::-webkit-scrollbar-thumb:hover {
+          background: ${this.config.primaryColor}60;
+        }
+        
+        /* Loading state */
+        .tf-loading {
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(0,0,0,0.3);
+          border-top-color: #0a0a0a;
+          border-radius: 50%;
+          animation: tf-spin 0.8s linear infinite;
+          margin-right: 8px;
+          vertical-align: middle;
+        }
+        
+        @keyframes tf-spin {
+          to { transform: rotate(360deg); }
         }
       `;
       
       const styleEl = document.createElement('style');
       styleEl.textContent = styles;
       this.shadow.appendChild(styleEl);
+    }
+
+    /**
+     * Lighten a hex color
+     */
+    lightenColor(color, percent) {
+      const num = parseInt(color.replace('#', ''), 16);
+      const amt = Math.round(2.55 * percent);
+      const R = (num >> 16) + amt;
+      const G = (num >> 8 & 0x00FF) + amt;
+      const B = (num & 0x0000FF) + amt;
+      return '#' + (
+        0x1000000 +
+        (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+        (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+        (B < 255 ? B < 1 ? 0 : B : 255)
+      ).toString(16).slice(1);
     }
 
     /**
@@ -353,8 +513,9 @@
     createButton() {
       this.button = document.createElement('button');
       this.button.className = 'tf-widget-button';
+      this.button.setAttribute('aria-label', 'Abrir feedback');
       this.button.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
       `;
@@ -378,41 +539,37 @@
             <h3 class="tf-modal-title">${this.escapeHtml(this.config.title)}</h3>
             ${this.config.subtitle ? `<p class="tf-modal-subtitle">${this.escapeHtml(this.config.subtitle)}</p>` : ''}
           </div>
-          <button class="tf-close-btn" id="tf-close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
+          <button class="tf-close-btn" id="tf-close-${this.host.id}" aria-label="Fechar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
         
         <div class="tf-modal-body">
           <!-- Step 1: NPS -->
-          <div id="tf-step-1" class="tf-step">
-            <p style="color: #a0a0a0; font-family: Inter, sans-serif; font-size: 14px; margin-bottom: 16px;">
-              Como você avalia sua experiência?
-            </p>
+          <div id="tf-step-1-${this.host.id}" class="tf-step">
+            <p class="tf-step-label">Como você avalia sua experiência?</p>
             <div class="tf-nps-scale">
               ${[0,1,2,3,4,5,6,7,8,9,10].map(n => `
-                <button class="tf-nps-btn" data-nps="${n}">${n}</button>
+                <button class="tf-nps-btn" data-nps="${n}" aria-label="Nota ${n}">${n}</button>
               `).join('')}
             </div>
             <div class="tf-nps-labels">
-              <span>Ruim</span>
-              <span>Excelente</span>
+              <span>Pouco provável</span>
+              <span>Muito provável</span>
             </div>
-            <button class="tf-submit-btn" id="tf-next-1" style="margin-top: 24px;" disabled>Próximo</button>
+            <button class="tf-submit-btn" id="tf-next-1-${this.host.id}" style="margin-top: 24px;" disabled>Próximo</button>
           </div>
           
           <!-- Step 2: Feedback Type -->
-          <div id="tf-step-2" class="tf-step tf-hidden">
-            <p style="color: #a0a0a0; font-family: Inter, sans-serif; font-size: 14px; margin-bottom: 16px;">
-              Que tipo de feedback você quer compartilhar?
-            </p>
+          <div id="tf-step-2-${this.host.id}" class="tf-step tf-hidden">
+            <p class="tf-step-label">Que tipo de feedback você quer compartilhar?</p>
             <div class="tf-type-buttons">
               ${this.config.enableSuggestions ? `
                 <button class="tf-type-btn" data-type="suggestion">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
                     <circle cx="12" cy="12" r="5"/>
                     <line x1="12" y1="1" x2="12" y2="3"/>
                     <line x1="12" y1="21" x2="12" y2="23"/>
@@ -428,8 +585,8 @@
               ` : ''}
               ${this.config.enableBugs ? `
                 <button class="tf-type-btn" data-type="bug">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="8" y="6" width="8" height="12" rx="2"/>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+                    <rect x="8" y="6" width="8" height="12" rx="0"/>
                     <line x1="12" y1="12" x2="12" y2="12.01"/>
                     <path d="M8 8h.01"/>
                     <path d="M16 8h.01"/>
@@ -440,21 +597,19 @@
                 </button>
               ` : ''}
             </div>
-            <button class="tf-submit-btn" id="tf-next-2" disabled>Próximo</button>
+            <button class="tf-submit-btn" id="tf-next-2-${this.host.id}" disabled>Próximo</button>
           </div>
           
           <!-- Step 3: Feedback Text -->
-          <div id="tf-step-3" class="tf-step tf-hidden">
-            <p style="color: #a0a0a0; font-family: Inter, sans-serif; font-size: 14px; margin-bottom: 16px;">
-              Conte-nos mais detalhes:
-            </p>
-            <textarea class="tf-textarea" id="tf-feedback-text" placeholder="Descreva sua experiência..."></textarea>
-            <button class="tf-submit-btn" id="tf-submit">Enviar Feedback</button>
+          <div id="tf-step-3-${this.host.id}" class="tf-step tf-hidden">
+            <input type="text" class="tf-title-input" id="tf-title-${this.host.id}" placeholder="Título do feedback (opcional)" maxlength="100" />
+            <textarea class="tf-textarea" id="tf-feedback-text-${this.host.id}" placeholder="Conte-nos mais detalhes sobre sua experiência..."></textarea>
+            <button class="tf-submit-btn" id="tf-submit-${this.host.id}">Enviar Feedback</button>
           </div>
           
           <!-- Success -->
-          <div id="tf-success" class="tf-success tf-hidden">
-            <svg class="tf-success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div id="tf-success-${this.host.id}" class="tf-success tf-hidden">
+            <svg class="tf-success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
@@ -475,8 +630,13 @@
      * Bind event listeners
      */
     bindEvents() {
+      const hostId = this.host.id;
+      
       // Close button
-      this.shadow.getElementById('tf-close').addEventListener('click', () => this.closeModal());
+      const closeBtn = this.shadow.getElementById(`tf-close-${hostId}`);
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => this.closeModal());
+      }
       
       // Click outside to close
       this.overlay.addEventListener('click', (e) => {
@@ -489,20 +649,27 @@
           this.selectedNps = parseInt(e.target.dataset.nps);
           this.shadow.querySelectorAll('.tf-nps-btn').forEach(b => b.classList.remove('selected'));
           e.target.classList.add('selected');
-          this.shadow.getElementById('tf-next-1').disabled = false;
+          const nextBtn = this.shadow.getElementById(`tf-next-1-${hostId}`);
+          if (nextBtn) nextBtn.disabled = false;
         });
       });
       
       // Next buttons
-      this.shadow.getElementById('tf-next-1').addEventListener('click', () => {
-        if (!this.config.enableSuggestions && !this.config.enableBugs) {
-          this.goToStep(3);
-        } else {
-          this.goToStep(2);
-        }
-      });
+      const next1 = this.shadow.getElementById(`tf-next-1-${hostId}`);
+      if (next1) {
+        next1.addEventListener('click', () => {
+          if (!this.config.enableSuggestions && !this.config.enableBugs) {
+            this.goToStep(3);
+          } else {
+            this.goToStep(2);
+          }
+        });
+      }
       
-      this.shadow.getElementById('tf-next-2').addEventListener('click', () => this.goToStep(3));
+      const next2 = this.shadow.getElementById(`tf-next-2-${hostId}`);
+      if (next2) {
+        next2.addEventListener('click', () => this.goToStep(3));
+      }
       
       // Type buttons
       this.shadow.querySelectorAll('.tf-type-btn').forEach(btn => {
@@ -510,12 +677,21 @@
           this.feedbackType = e.currentTarget.dataset.type;
           this.shadow.querySelectorAll('.tf-type-btn').forEach(b => b.classList.remove('selected'));
           e.currentTarget.classList.add('selected');
-          this.shadow.getElementById('tf-next-2').disabled = false;
+          const nextBtn = this.shadow.getElementById(`tf-next-2-${hostId}`);
+          if (nextBtn) nextBtn.disabled = false;
         });
       });
       
       // Submit
-      this.shadow.getElementById('tf-submit').addEventListener('click', () => this.submitFeedback());
+      const submitBtn = this.shadow.getElementById(`tf-submit-${hostId}`);
+      if (submitBtn) {
+        submitBtn.addEventListener('click', () => this.submitFeedback());
+      }
+      
+      // Keyboard shortcuts
+      this.overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.closeModal();
+      });
     }
 
     /**
@@ -525,6 +701,12 @@
       this.isOpen = true;
       this.overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
+      
+      // Focus trap for accessibility
+      setTimeout(() => {
+        const firstFocusable = this.shadow.querySelector('button, input, textarea');
+        if (firstFocusable) firstFocusable.focus();
+      }, 100);
     }
 
     /**
@@ -538,61 +720,86 @@
       // Reset after animation
       setTimeout(() => {
         this.resetForm();
-      }, 200);
+      }, 250);
     }
 
     /**
      * Go to specific step
      */
     goToStep(step) {
+      const hostId = this.host.id;
       this.shadow.querySelectorAll('.tf-step').forEach(el => el.classList.add('tf-hidden'));
-      this.shadow.getElementById(`tf-step-${step}`).classList.remove('tf-hidden');
+      const stepEl = this.shadow.getElementById(`tf-step-${step}-${hostId}`);
+      if (stepEl) stepEl.classList.remove('tf-hidden');
     }
 
     /**
      * Reset form
      */
     resetForm() {
+      const hostId = this.host.id;
       this.currentStep = 1;
       this.selectedNps = null;
       this.feedbackType = null;
+      this.feedbackTitle = '';
       
       this.shadow.querySelectorAll('.tf-step').forEach(el => el.classList.add('tf-hidden'));
-      this.shadow.getElementById('tf-step-1').classList.remove('tf-hidden');
-      this.shadow.getElementById('tf-success').classList.add('tf-hidden');
+      const step1 = this.shadow.getElementById(`tf-step-1-${hostId}`);
+      if (step1) step1.classList.remove('tf-hidden');
+      
+      const successEl = this.shadow.getElementById(`tf-success-${hostId}`);
+      if (successEl) successEl.classList.add('tf-hidden');
       
       this.shadow.querySelectorAll('.tf-nps-btn').forEach(b => b.classList.remove('selected'));
       this.shadow.querySelectorAll('.tf-type-btn').forEach(b => b.classList.remove('selected'));
-      this.shadow.getElementById('tf-feedback-text').value = '';
       
-      this.shadow.getElementById('tf-next-1').disabled = true;
-      this.shadow.getElementById('tf-next-2').disabled = true;
+      const titleInput = this.shadow.getElementById(`tf-title-${hostId}`);
+      if (titleInput) titleInput.value = '';
+      
+      const textArea = this.shadow.getElementById(`tf-feedback-text-${hostId}`);
+      if (textArea) textArea.value = '';
+      
+      const next1 = this.shadow.getElementById(`tf-next-1-${hostId}`);
+      if (next1) next1.disabled = true;
+      
+      const next2 = this.shadow.getElementById(`tf-next-2-${hostId}`);
+      if (next2) next2.disabled = true;
     }
 
     /**
      * Submit feedback
      */
     async submitFeedback() {
-      const text = this.shadow.getElementById('tf-feedback-text').value.trim();
-      const submitBtn = this.shadow.getElementById('tf-submit');
+      const hostId = this.host.id;
+      const textEl = this.shadow.getElementById(`tf-feedback-text-${hostId}`);
+      const titleEl = this.shadow.getElementById(`tf-title-${hostId}`);
+      const text = textEl ? textEl.value.trim() : '';
+      const title = titleEl ? titleEl.value.trim() : '';
+      const submitBtn = this.shadow.getElementById(`tf-submit-${hostId}`);
       
       if (!text) {
-        this.shadow.getElementById('tf-feedback-text').focus();
+        if (textEl) textEl.focus();
         return;
       }
       
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Enviando...';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="tf-loading"></span>Enviando...';
+      }
       
       try {
-        const response = await fetch(`${CONFIG.apiUrl}/api/feedback`, {
+        const response = await fetch(`${CONFIG.apiUrl}/api/widget/feedback`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-API-Key': this.config.apiKey,
+          },
           body: JSON.stringify({
-            widget_key: this.config.widgetKey,
+            project_id: this.config.projectId,
             type: this.feedbackType || 'suggestion',
             nps_score: this.selectedNps,
             content: text,
+            title: title || null,
             page_url: window.location.href,
             user_agent: navigator.userAgent,
           }),
@@ -600,16 +807,20 @@
         
         if (response.ok) {
           this.shadow.querySelectorAll('.tf-step').forEach(el => el.classList.add('tf-hidden'));
-          this.shadow.getElementById('tf-success').classList.remove('tf-hidden');
+          const successEl = this.shadow.getElementById(`tf-success-${hostId}`);
+          if (successEl) successEl.classList.remove('tf-hidden');
           
           setTimeout(() => this.closeModal(), 3000);
         } else {
-          throw new Error('Failed to submit');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to submit');
         }
       } catch (error) {
         console.error('TinyFeedback:', error);
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Enviar Feedback';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar Feedback';
+        }
         alert('Erro ao enviar feedback. Tente novamente.');
       }
     }
@@ -618,6 +829,7 @@
      * Escape HTML to prevent XSS
      */
     escapeHtml(text) {
+      if (!text) return '';
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
@@ -627,30 +839,36 @@
   /**
    * Initialize widget from data attributes
    */
-  function initWidget() {
+  async function initWidget() {
     const scripts = document.querySelectorAll('script[data-widget-key]');
     
-    scripts.forEach(script => {
+    for (const script of scripts) {
       const widgetKey = script.dataset.widgetKey;
-      if (!widgetKey) return;
+      if (!widgetKey) continue;
       
       // Prevent duplicate initialization
-      if (script.dataset.initialized) return;
+      if (script.dataset.initialized === 'true') continue;
       script.dataset.initialized = 'true';
       
-      // Load config from API
-      fetch(`${CONFIG.apiUrl}/api/widget/${widgetKey}/config`)
-        .then(res => res.json())
-        .then(config => {
-          widgetInstance = new TinyFeedbackWidget({
-            widgetKey,
-            ...config,
-          });
-        })
-        .catch(err => {
-          console.error('TinyFeedback: Failed to load config', err);
-        });
-    });
+      try {
+        // Load config from API
+        const response = await fetch(`${CONFIG.apiUrl}/api/widget/${encodeURIComponent(widgetKey)}/config`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load widget config: ${response.status}`);
+        }
+        
+        const config = await response.json();
+        
+        // Create widget instance
+        const widget = new TinyFeedbackWidget(config);
+        widgetInstances.set(widgetKey, widget);
+        
+        console.log('TinyFeedback: Widget initialized for key:', widgetKey);
+      } catch (err) {
+        console.error('TinyFeedback: Failed to initialize widget:', err);
+      }
+    }
   }
 
   // Auto-initialize on DOM ready
@@ -664,6 +882,7 @@
   window.TinyFeedback = {
     init: initWidget,
     Widget: TinyFeedbackWidget,
+    version: '1.0.0',
   };
 
 })();
