@@ -140,5 +140,175 @@ export function getRateLimitErrorMessage(retryAfter: number): string {
   return `Muitas tentativas. Tente novamente em ${retryAfter} segundos.`;
 }
 
-export { MAX_REQUESTS, WINDOW_MS };
+// ============================================
+// Widget-specific rate limiting (ST-14)
+// ============================================
+
+interface WidgetRateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+}
+
+// Store for widget-specific rate limiting
+const widgetRateLimitStore = new Map<string, RateLimitEntry>();
+
+// ST-14: Rate limiting configuration
+const WIDGET_IP_CONFIG: WidgetRateLimitConfig = {
+  windowMs: 60 * 1000, // 1 minute
+  maxRequests: 5, // 5 requests per minute per IP
+};
+
+const WIDGET_GLOBAL_CONFIG: WidgetRateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 100, // 100 requests per hour per widget
+};
+
+/**
+ * Check widget-specific rate limit (per IP)
+ * ST-14: 5 requests per minute per IP
+ */
+export function checkWidgetIPRateLimit(ip: string): RateLimitResult {
+  const now = Date.now();
+  const key = `widget:ip:${ip}`;
+  const entry = widgetRateLimitStore.get(key);
+
+  if (entry && now > entry.resetTime) {
+    widgetRateLimitStore.delete(key);
+  }
+
+  const currentEntry = widgetRateLimitStore.get(key);
+
+  if (!currentEntry) {
+    const resetTime = now + WIDGET_IP_CONFIG.windowMs;
+    widgetRateLimitStore.set(key, {
+      count: 1,
+      resetTime,
+    });
+
+    return {
+      success: true,
+      limit: WIDGET_IP_CONFIG.maxRequests,
+      remaining: WIDGET_IP_CONFIG.maxRequests - 1,
+      resetTime,
+    };
+  }
+
+  if (now > currentEntry.resetTime) {
+    const resetTime = now + WIDGET_IP_CONFIG.windowMs;
+    widgetRateLimitStore.set(key, {
+      count: 1,
+      resetTime,
+    });
+
+    return {
+      success: true,
+      limit: WIDGET_IP_CONFIG.maxRequests,
+      remaining: WIDGET_IP_CONFIG.maxRequests - 1,
+      resetTime,
+    };
+  }
+
+  if (currentEntry.count >= WIDGET_IP_CONFIG.maxRequests) {
+    const retryAfter = Math.ceil((currentEntry.resetTime - now) / 1000);
+
+    return {
+      success: false,
+      limit: WIDGET_IP_CONFIG.maxRequests,
+      remaining: 0,
+      resetTime: currentEntry.resetTime,
+      retryAfter,
+    };
+  }
+
+  currentEntry.count += 1;
+
+  return {
+    success: true,
+    limit: WIDGET_IP_CONFIG.maxRequests,
+    remaining: WIDGET_IP_CONFIG.maxRequests - currentEntry.count,
+    resetTime: currentEntry.resetTime,
+  };
+}
+
+/**
+ * Check widget-specific rate limit (per widget ID)
+ * ST-14: 100 requests per hour per widget
+ */
+export function checkWidgetGlobalRateLimit(widgetId: string): RateLimitResult {
+  const now = Date.now();
+  const key = `widget:${widgetId}`;
+  const entry = widgetRateLimitStore.get(key);
+
+  if (entry && now > entry.resetTime) {
+    widgetRateLimitStore.delete(key);
+  }
+
+  const currentEntry = widgetRateLimitStore.get(key);
+
+  if (!currentEntry) {
+    const resetTime = now + WIDGET_GLOBAL_CONFIG.windowMs;
+    widgetRateLimitStore.set(key, {
+      count: 1,
+      resetTime,
+    });
+
+    return {
+      success: true,
+      limit: WIDGET_GLOBAL_CONFIG.maxRequests,
+      remaining: WIDGET_GLOBAL_CONFIG.maxRequests - 1,
+      resetTime,
+    };
+  }
+
+  if (now > currentEntry.resetTime) {
+    const resetTime = now + WIDGET_GLOBAL_CONFIG.windowMs;
+    widgetRateLimitStore.set(key, {
+      count: 1,
+      resetTime,
+    });
+
+    return {
+      success: true,
+      limit: WIDGET_GLOBAL_CONFIG.maxRequests,
+      remaining: WIDGET_GLOBAL_CONFIG.maxRequests - 1,
+      resetTime,
+    };
+  }
+
+  if (currentEntry.count >= WIDGET_GLOBAL_CONFIG.maxRequests) {
+    const retryAfter = Math.ceil((currentEntry.resetTime - now) / 1000);
+
+    return {
+      success: false,
+      limit: WIDGET_GLOBAL_CONFIG.maxRequests,
+      remaining: 0,
+      resetTime: currentEntry.resetTime,
+      retryAfter,
+    };
+  }
+
+  currentEntry.count += 1;
+
+  return {
+    success: true,
+    limit: WIDGET_GLOBAL_CONFIG.maxRequests,
+    remaining: WIDGET_GLOBAL_CONFIG.maxRequests - currentEntry.count,
+    resetTime: currentEntry.resetTime,
+  };
+}
+
+/**
+ * Generate unique ticket ID for feedback
+ * ST-14: Format TF-XXXXXXXX (8 random alphanumeric chars)
+ */
+export function generateTicketId(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = 'TF-';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export { MAX_REQUESTS, WINDOW_MS, WIDGET_IP_CONFIG, WIDGET_GLOBAL_CONFIG };
 export type { RateLimitResult };
