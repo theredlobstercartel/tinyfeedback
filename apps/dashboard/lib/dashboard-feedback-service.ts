@@ -119,6 +119,7 @@ export async function getFeedbackStats(projectId: string): Promise<FeedbackStats
   const stats = {
     total: data.length,
     new: data.filter(f => f.status === 'new').length,
+    read: data.filter(f => f.status === 'read').length,
     analyzing: data.filter(f => f.status === 'analyzing').length,
     implemented: data.filter(f => f.status === 'implemented').length,
     archived: data.filter(f => f.status === 'archived').length,

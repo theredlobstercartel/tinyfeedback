@@ -80,6 +80,23 @@ export default function FeedbacksPage() {
       .filter(Boolean) as string[]
   }, [rowSelection, feedbacksData])
 
+  // Calculate adjacent feedbacks for navigation
+  const adjacentFeedbacks = useMemo(() => {
+    if (!viewingFeedback || !feedbacksData?.data) {
+      return { prev: null, next: null }
+    }
+    
+    const currentIndex = feedbacksData.data.findIndex(f => f.id === viewingFeedback.id)
+    if (currentIndex === -1) {
+      return { prev: null, next: null }
+    }
+    
+    return {
+      prev: currentIndex > 0 ? feedbacksData.data[currentIndex - 1] : null,
+      next: currentIndex < feedbacksData.data.length - 1 ? feedbacksData.data[currentIndex + 1] : null,
+    }
+  }, [viewingFeedback, feedbacksData])
+
   // Handlers
   const handleFiltersChange = useCallback((newFilters: FeedbackFilters) => {
     setFilters(newFilters)
@@ -165,6 +182,14 @@ export default function FeedbacksPage() {
       setViewingFeedback(null)
     }
   }, [viewingFeedback, handleStatusChange])
+
+  // Handle navigation between feedbacks
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    const target = direction === 'prev' ? adjacentFeedbacks.prev : adjacentFeedbacks.next
+    if (target) {
+      setViewingFeedback(target)
+    }
+  }, [adjacentFeedbacks])
 
   // Show error state
   if (error) {
@@ -255,6 +280,8 @@ export default function FeedbacksPage() {
         isOpen={!!viewingFeedback}
         onClose={() => setViewingFeedback(null)}
         onStatusChange={handleModalStatusChange}
+        onNavigate={handleNavigate}
+        adjacentFeedbacks={adjacentFeedbacks}
       />
     </DashboardLayout>
   )
