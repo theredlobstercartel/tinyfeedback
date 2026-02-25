@@ -2,11 +2,14 @@
  * TinyFeedback Widget
  * Main entry point for the vanilla JS widget
  * ST-05: Criar Widget Vanilla JS (<20KB)
+ * ST-06: Widget Screenshot e Anexos
  */
 
 import { NPSModal, NPSModalOptions } from './modals/NPSModal.js';
 import { SuggestionModal, SuggestionModalOptions } from './modals/SuggestionModal.js';
 import { BugModal, BugModalOptions } from './modals/BugModal.js';
+import { AttachmentUI, AttachmentUIOptions, AttachmentFile } from './components/AttachmentUI.js';
+import { AttachmentHandler, AttachmentOptions } from './utils/AttachmentHandler.js';
 
 interface WidgetConfig {
   projectId: string;
@@ -401,7 +404,9 @@ class TinyFeedbackWidget {
 
 // Export for UMD build
 export { TinyFeedbackWidget, NPSModal, SuggestionModal, BugModal };
+export { AttachmentUI, AttachmentHandler };
 export type { NPSModalOptions, SuggestionModalOptions, BugModalOptions };
+export type { AttachmentOptions, AttachmentFile, AttachmentUIOptions };
 export type { WidgetConfig };
 
 // Global window interface

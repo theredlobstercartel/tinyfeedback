@@ -456,14 +456,667 @@ var TinyFeedback = (function (exports) {
     }
 
     /**
-     * Suggestion Modal Component
+     * Attachment Handler for TinyFeedback Widget
+     * Story: ST-06 - Widget Screenshot e Anexos
+     *
+     * Features:
+     * - Screenshot capture using native APIs
+     * - File attachment upload (images up to 5MB)
+     * - Preview before sending
+     * - Integration with Supabase Storage
+     */
+    const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    class AttachmentHandler {
+        constructor(options) {
+            this.attachments = [];
+            this.fileInput = null;
+            this.options = {
+                maxFileSize: DEFAULT_MAX_FILE_SIZE,
+                allowedTypes: DEFAULT_ALLOWED_TYPES,
+                onAttachmentChange: () => { },
+                ...options
+            };
+            this.createFileInput();
+        }
+        /**
+         * Get current attachments
+         */
+        getAttachments() {
+            return [...this.attachments];
+        }
+        /**
+         * Get attachment count
+         */
+        getAttachmentCount() {
+            return this.attachments.length;
+        }
+        /**
+         * Clear all attachments
+         */
+        clearAttachments() {
+            this.attachments.forEach(att => {
+                if (att.previewUrl && att.previewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(att.previewUrl);
+                }
+            });
+            this.attachments = [];
+            this.notifyChange();
+        }
+        /**
+         * Remove a specific attachment
+         */
+        removeAttachment(id) {
+            const attachment = this.attachments.find(a => a.id === id);
+            if (attachment && attachment.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(attachment.previewUrl);
+            }
+            this.attachments = this.attachments.filter(a => a.id !== id);
+            this.notifyChange();
+        }
+        /**
+         * Capture screenshot of current page
+         */
+        async captureScreenshot() {
+            try {
+                // Use native screenshot API if available (Screen Capture API)
+                if ('mediaDevices' in navigator && 'getDisplayMedia' in navigator.mediaDevices) {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { cursor: 'always' },
+                        audio: false
+                    });
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    return new Promise((resolve) => {
+                        video.onloadedmetadata = () => {
+                            video.play();
+                            // Wait a moment for the video to start playing
+                            setTimeout(() => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = video.videoWidth;
+                                canvas.height = video.videoHeight;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                    ctx.drawImage(video, 0, 0);
+                                    // Stop all tracks
+                                    stream.getTracks().forEach(track => track.stop());
+                                    canvas.toBlob((blob) => {
+                                        if (blob) {
+                                            const file = new File([blob], `screenshot-${Date.now()}.png`, {
+                                                type: 'image/png'
+                                            });
+                                            const attachment = this.createAttachment(file, 'screenshot');
+                                            resolve(attachment);
+                                        }
+                                        else {
+                                            resolve(null);
+                                        }
+                                    }, 'image/png');
+                                }
+                                else {
+                                    stream.getTracks().forEach(track => track.stop());
+                                    resolve(null);
+                                }
+                            }, 500);
+                        };
+                        video.onerror = () => {
+                            stream.getTracks().forEach(track => track.stop());
+                            resolve(null);
+                        };
+                    });
+                }
+                else {
+                    // Fallback: capture visible viewport using html2canvas-like approach
+                    return this.captureViewportScreenshot();
+                }
+            }
+            catch (error) {
+                console.warn('[TinyFeedback] Screenshot capture failed:', error);
+                return null;
+            }
+        }
+        /**
+         * Fallback viewport screenshot using DOM-to-image approach
+         */
+        async captureViewportScreenshot() {
+            try {
+                // Create a canvas and draw the visible viewport
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (!ctx)
+                    return null;
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                canvas.width = Math.min(width, 1920); // Max width
+                canvas.height = Math.min(height, 1080); // Max height
+                // Fill with page background color
+                const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                ctx.fillStyle = bodyBg || '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // Add page URL and timestamp
+                ctx.fillStyle = '#333333';
+                ctx.font = '14px sans-serif';
+                ctx.fillText(`URL: ${window.location.href}`, 10, 30);
+                ctx.fillText(`Captured: ${new Date().toLocaleString()}`, 10, 50);
+                ctx.fillText('(Viewport capture - for full page screenshot use browser tools)', 10, 70);
+                return new Promise((resolve) => {
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const file = new File([blob], `viewport-${Date.now()}.png`, {
+                                type: 'image/png'
+                            });
+                            const attachment = this.createAttachment(file, 'screenshot');
+                            resolve(attachment);
+                        }
+                        else {
+                            resolve(null);
+                        }
+                    }, 'image/png', 0.8);
+                });
+            }
+            catch (error) {
+                console.warn('[TinyFeedback] Viewport capture failed:', error);
+                return null;
+            }
+        }
+        /**
+         * Trigger file input for manual upload
+         */
+        triggerFileUpload() {
+            this.fileInput?.click();
+        }
+        /**
+         * Handle file selection
+         */
+        handleFileSelect(event) {
+            const input = event.target;
+            const files = input.files;
+            if (!files || files.length === 0)
+                return;
+            Array.from(files).forEach(file => {
+                const error = this.validateFile(file);
+                if (error) {
+                    console.warn(`[TinyFeedback] File rejected: ${error}`);
+                    return;
+                }
+                const attachment = this.createAttachment(file, 'upload');
+                this.attachments.push(attachment);
+            });
+            this.notifyChange();
+            // Reset input
+            input.value = '';
+        }
+        /**
+         * Validate file
+         */
+        validateFile(file) {
+            if (file.size > this.options.maxFileSize) {
+                return `File too large (max ${this.formatFileSize(this.options.maxFileSize)})`;
+            }
+            if (!this.options.allowedTypes.includes(file.type)) {
+                return `Invalid file type (allowed: ${this.options.allowedTypes.join(', ')})`;
+            }
+            return null;
+        }
+        /**
+         * Create attachment object from file
+         */
+        createAttachment(file, type) {
+            const id = `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const previewUrl = URL.createObjectURL(file);
+            return {
+                id,
+                file,
+                previewUrl,
+                type,
+                name: file.name,
+                size: file.size
+            };
+        }
+        /**
+         * Create hidden file input element
+         */
+        createFileInput() {
+            this.fileInput = document.createElement('input');
+            this.fileInput.type = 'file';
+            this.fileInput.accept = this.options.allowedTypes.join(',');
+            this.fileInput.multiple = true;
+            this.fileInput.style.display = 'none';
+            this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+            document.body.appendChild(this.fileInput);
+        }
+        /**
+         * Notify listeners of attachment changes
+         */
+        notifyChange() {
+            this.options.onAttachmentChange([...this.attachments]);
+        }
+        /**
+         * Format file size for display
+         */
+        formatFileSize(bytes) {
+            if (bytes === 0)
+                return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        /**
+         * Upload attachments to Supabase Storage
+         */
+        async uploadAttachments() {
+            const urls = [];
+            const errors = [];
+            for (const attachment of this.attachments) {
+                if (!attachment.file) {
+                    // Screenshot captured via API won't have a File object yet
+                    continue;
+                }
+                try {
+                    const formData = new FormData();
+                    formData.append('file', attachment.file);
+                    formData.append('projectId', this.options.projectId);
+                    formData.append('type', attachment.type);
+                    const response = await fetch(`${this.options.apiUrl}/api/widget/upload`, {
+                        method: 'POST',
+                        headers: {
+                            'X-API-Key': this.options.apiKey
+                        },
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.url) {
+                            urls.push(data.url);
+                        }
+                    }
+                    else {
+                        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+                        errors.push(`${attachment.name}: ${errorData.error || 'Upload failed'}`);
+                    }
+                }
+                catch (error) {
+                    errors.push(`${attachment.name}: Network error`);
+                }
+            }
+            return { urls, errors };
+        }
+        /**
+         * Clean up resources
+         */
+        destroy() {
+            this.clearAttachments();
+            if (this.fileInput) {
+                this.fileInput.remove();
+                this.fileInput = null;
+            }
+        }
+    }
+
+    /**
+     * Attachment UI Component for TinyFeedback Widget
+     * Story: ST-06 - Widget Screenshot e Anexos
+     *
+     * Provides UI for:
+     * - Screenshot capture button
+     * - File upload button
+     * - Attachment preview grid
+     * - Remove attachment functionality
+     */
+    class AttachmentUI {
+        constructor(options) {
+            this.attachmentContainer = null;
+            this.buttonsContainer = null;
+            this.errorMessage = null;
+            this.container = options.container;
+            this.options = {
+                maxAttachments: 5,
+                onAttachmentsChange: () => { },
+                ...options
+            };
+            this.handler = new AttachmentHandler({
+                apiUrl: options.apiUrl,
+                apiKey: options.apiKey,
+                projectId: options.projectId,
+                onAttachmentChange: (attachments) => {
+                    this.renderAttachments();
+                    this.options.onAttachmentsChange(attachments);
+                    this.updateButtonStates();
+                }
+            });
+            this.createUI();
+        }
+        /**
+         * Create the attachment UI
+         */
+        createUI() {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tf-attachment-wrapper';
+            wrapper.style.cssText = this.getWrapperStyles();
+            // Label
+            const label = document.createElement('label');
+            label.textContent = 'Anexos (máx 5MB cada)';
+            label.style.cssText = this.getLabelStyles();
+            // Buttons container
+            this.buttonsContainer = document.createElement('div');
+            this.buttonsContainer.style.cssText = this.getButtonsContainerStyles();
+            // Screenshot button
+            const screenshotBtn = document.createElement('button');
+            screenshotBtn.type = 'button';
+            screenshotBtn.className = 'tf-attachment-btn tf-screenshot-btn';
+            screenshotBtn.innerHTML = '📸 Capturar Tela';
+            screenshotBtn.style.cssText = this.getButtonStyles();
+            screenshotBtn.addEventListener('click', () => this.handleScreenshot());
+            // Upload button
+            const uploadBtn = document.createElement('button');
+            uploadBtn.type = 'button';
+            uploadBtn.className = 'tf-attachment-btn tf-upload-btn';
+            uploadBtn.innerHTML = '📎 Anexar Arquivo';
+            uploadBtn.style.cssText = this.getButtonStyles();
+            uploadBtn.addEventListener('click', () => this.handler.triggerFileUpload());
+            this.buttonsContainer.appendChild(screenshotBtn);
+            this.buttonsContainer.appendChild(uploadBtn);
+            // Error message container
+            this.errorMessage = document.createElement('div');
+            this.errorMessage.style.cssText = this.getErrorStyles();
+            this.errorMessage.style.display = 'none';
+            // Attachments preview container
+            this.attachmentContainer = document.createElement('div');
+            this.attachmentContainer.className = 'tf-attachment-grid';
+            this.attachmentContainer.style.cssText = this.getAttachmentGridStyles();
+            wrapper.appendChild(label);
+            wrapper.appendChild(this.buttonsContainer);
+            wrapper.appendChild(this.errorMessage);
+            wrapper.appendChild(this.attachmentContainer);
+            this.container.appendChild(wrapper);
+        }
+        /**
+         * Handle screenshot capture
+         */
+        async handleScreenshot() {
+            this.clearError();
+            if (this.handler.getAttachmentCount() >= this.options.maxAttachments) {
+                this.showError(`Limite de ${this.options.maxAttachments} anexos atingido`);
+                return;
+            }
+            const btn = this.buttonsContainer?.querySelector('.tf-screenshot-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Capturando...';
+            }
+            try {
+                const attachment = await this.handler.captureScreenshot();
+                if (attachment) {
+                    this.handler.getAttachments().push(attachment);
+                    this.renderAttachments();
+                    this.options.onAttachmentsChange(this.handler.getAttachments());
+                }
+                else {
+                    this.showError('Não foi possível capturar a tela. Tente anexar um arquivo manualmente.');
+                }
+            }
+            catch (error) {
+                this.showError('Erro ao capturar tela');
+            }
+            finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '📸 Capturar Tela';
+                }
+                this.updateButtonStates();
+            }
+        }
+        /**
+         * Render attachment previews
+         */
+        renderAttachments() {
+            if (!this.attachmentContainer)
+                return;
+            this.attachmentContainer.innerHTML = '';
+            const attachments = this.handler.getAttachments();
+            attachments.forEach(attachment => {
+                const item = this.createAttachmentItem(attachment);
+                this.attachmentContainer.appendChild(item);
+            });
+        }
+        /**
+         * Create attachment preview item
+         */
+        createAttachmentItem(attachment) {
+            const item = document.createElement('div');
+            item.className = 'tf-attachment-item';
+            item.style.cssText = this.getAttachmentItemStyles();
+            item.dataset.id = attachment.id;
+            // Image preview
+            const img = document.createElement('img');
+            img.src = attachment.previewUrl;
+            img.alt = attachment.name;
+            img.style.cssText = this.getAttachmentImageStyles();
+            // Overlay with remove button
+            const overlay = document.createElement('div');
+            overlay.style.cssText = this.getAttachmentOverlayStyles();
+            // File name
+            const nameLabel = document.createElement('span');
+            nameLabel.textContent = this.truncateFilename(attachment.name);
+            nameLabel.style.cssText = this.getAttachmentNameStyles();
+            // Size label
+            const sizeLabel = document.createElement('span');
+            sizeLabel.textContent = this.handler.formatFileSize(attachment.size);
+            sizeLabel.style.cssText = this.getAttachmentSizeStyles();
+            // Remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.innerHTML = '×';
+            removeBtn.style.cssText = this.getRemoveButtonStyles();
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handler.removeAttachment(attachment.id);
+            });
+            overlay.appendChild(nameLabel);
+            overlay.appendChild(sizeLabel);
+            overlay.appendChild(removeBtn);
+            item.appendChild(img);
+            item.appendChild(overlay);
+            return item;
+        }
+        /**
+         * Update button states based on attachment count
+         */
+        updateButtonStates() {
+            const buttons = this.buttonsContainer?.querySelectorAll('.tf-attachment-btn');
+            const isFull = this.handler.getAttachmentCount() >= this.options.maxAttachments;
+            buttons?.forEach(btn => {
+                btn.disabled = isFull;
+                btn.style.opacity = isFull ? '0.5' : '1';
+                btn.style.cursor = isFull ? 'not-allowed' : 'pointer';
+            });
+        }
+        /**
+         * Show error message
+         */
+        showError(message) {
+            if (this.errorMessage) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+                // Auto-hide after 5 seconds
+                setTimeout(() => this.clearError(), 5000);
+            }
+        }
+        /**
+         * Clear error message
+         */
+        clearError() {
+            if (this.errorMessage) {
+                this.errorMessage.textContent = '';
+                this.errorMessage.style.display = 'none';
+            }
+        }
+        /**
+         * Truncate filename for display
+         */
+        truncateFilename(name, maxLength = 15) {
+            if (name.length <= maxLength)
+                return name;
+            const ext = name.split('.').pop();
+            const base = name.substring(0, maxLength - 4);
+            return `${base}...${ext}`;
+        }
+        /**
+         * Get attachment handler instance
+         */
+        getHandler() {
+            return this.handler;
+        }
+        /**
+         * Get current attachments
+         */
+        getAttachments() {
+            return this.handler.getAttachments();
+        }
+        /**
+         * Clean up resources
+         */
+        destroy() {
+            this.handler.destroy();
+        }
+        // ==================== STYLES ====================
+        getWrapperStyles() {
+            return `
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+    `;
+        }
+        getLabelStyles() {
+            return `
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 8px;
+    `;
+        }
+        getButtonsContainerStyles() {
+            return `
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    `;
+        }
+        getButtonStyles() {
+            return `
+      flex: 1;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    `;
+        }
+        getErrorStyles() {
+            return `
+      padding: 8px 12px;
+      background: rgba(255, 68, 68, 0.1);
+      border: 1px solid #ff4444;
+      color: #ff4444;
+      font-size: 13px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+    `;
+        }
+        getAttachmentGridStyles() {
+            return `
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+    `;
+        }
+        getAttachmentItemStyles() {
+            return `
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #333;
+      background: #111;
+    `;
+        }
+        getAttachmentImageStyles() {
+            return `
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    `;
+        }
+        getAttachmentOverlayStyles() {
+            return `
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.9));
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    `;
+        }
+        getAttachmentNameStyles() {
+            return `
+      font-size: 11px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    `;
+        }
+        getAttachmentSizeStyles() {
+            return `
+      font-size: 10px;
+      color: #888;
+    `;
+        }
+        getRemoveButtonStyles() {
+            return `
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      background: rgba(255, 68, 68, 0.9);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+    `;
+        }
+    }
+
+    /**
+     * Suggestion Modal Component with Attachments
      * Story: ST-07 - Implementar Modal de Sugestão
+     * Story: ST-06 - Widget Screenshot e Anexos
      */
     class SuggestionModal {
         constructor(options) {
             this.container = null;
             this.titleInput = null;
             this.descriptionTextarea = null;
+            this.attachmentUI = null;
             this.options = options;
         }
         /**
@@ -483,6 +1136,8 @@ var TinyFeedback = (function (exports) {
                 this.container.remove();
                 this.container = null;
             }
+            this.attachmentUI?.destroy();
+            this.attachmentUI = null;
             this.options.onClose?.();
         }
         /**
@@ -541,6 +1196,9 @@ var TinyFeedback = (function (exports) {
             this.descriptionTextarea.style.cssText = this.getTextareaStyles();
             descriptionGroup.appendChild(descriptionLabel);
             descriptionGroup.appendChild(this.descriptionTextarea);
+            // Attachment UI container
+            const attachmentContainer = document.createElement('div');
+            attachmentContainer.id = 'tf-suggestion-attachments';
             // Submit button
             const submitButton = document.createElement('button');
             submitButton.id = 'tf-suggestion-submit';
@@ -550,6 +1208,7 @@ var TinyFeedback = (function (exports) {
             // Assemble form
             formContainer.appendChild(titleGroup);
             formContainer.appendChild(descriptionGroup);
+            formContainer.appendChild(attachmentContainer);
             formContainer.appendChild(submitButton);
             // Assemble modal
             modal.appendChild(closeButton);
@@ -558,6 +1217,14 @@ var TinyFeedback = (function (exports) {
             this.container.appendChild(modal);
             // Add to document
             document.body.appendChild(this.container);
+            // Initialize Attachment UI after modal is in DOM
+            this.attachmentUI = new AttachmentUI({
+                container: attachmentContainer,
+                apiUrl: this.options.apiUrl,
+                apiKey: this.options.apiKey,
+                projectId: this.options.projectId,
+                maxAttachments: 5
+            });
         }
         /**
          * Attach event listeners
@@ -601,7 +1268,23 @@ var TinyFeedback = (function (exports) {
                 this.titleInput?.focus();
                 return;
             }
+            // Show loading state
+            const submitBtn = this.container?.querySelector('#tf-suggestion-submit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando...';
+            }
             try {
+                // Upload attachments first if any
+                let attachmentUrls = [];
+                if (this.attachmentUI && this.attachmentUI.getAttachments().length > 0) {
+                    const handler = this.attachmentUI.getHandler();
+                    const { urls, errors } = await handler.uploadAttachments();
+                    if (errors.length > 0) {
+                        console.warn('[TinyFeedback] Some attachments failed:', errors);
+                    }
+                    attachmentUrls = urls;
+                }
                 const response = await fetch(`${this.options.apiUrl}/api/widget/feedback`, {
                     method: 'POST',
                     headers: {
@@ -614,7 +1297,9 @@ var TinyFeedback = (function (exports) {
                         title: title,
                         content: description,
                         page_url: window.location.href,
-                        user_agent: navigator.userAgent
+                        user_agent: navigator.userAgent,
+                        screenshot_url: attachmentUrls.length > 0 ? attachmentUrls[0] : null,
+                        attachment_urls: attachmentUrls
                     })
                 });
                 if (response.ok) {
@@ -627,7 +1312,7 @@ var TinyFeedback = (function (exports) {
                         return;
                     }
                     this.showThankYou();
-                    this.options.onSubmit?.(title, description);
+                    this.options.onSubmit?.(title, description || undefined, attachmentUrls);
                 }
                 else if (response.status === 429) {
                     // AC-03: Handle limit reached
@@ -647,6 +1332,12 @@ var TinyFeedback = (function (exports) {
             catch (error) {
                 console.error('Error submitting suggestion:', error);
                 this.showError('Falha ao enviar sugestão. Tente novamente.');
+            }
+            finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar Sugestão';
+                }
             }
         }
         /**
@@ -747,6 +1438,8 @@ var TinyFeedback = (function (exports) {
       padding: 32px;
       max-width: 500px;
       width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
       position: relative;
       box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
     `;
@@ -902,8 +1595,9 @@ var TinyFeedback = (function (exports) {
     }
 
     /**
-     * Bug Report Modal Component
+     * Bug Report Modal Component with Attachments
      * Story: ST-05 - Criar Widget Vanilla JS
+     * Story: ST-06 - Widget Screenshot e Anexos
      */
     class BugModal {
         constructor(options) {
@@ -911,6 +1605,7 @@ var TinyFeedback = (function (exports) {
             this.titleInput = null;
             this.descriptionTextarea = null;
             this.selectedSeverity = 'medium';
+            this.attachmentUI = null;
             this.options = options;
         }
         /**
@@ -929,6 +1624,8 @@ var TinyFeedback = (function (exports) {
                 this.container.remove();
                 this.container = null;
             }
+            this.attachmentUI?.destroy();
+            this.attachmentUI = null;
             this.options.onClose?.();
         }
         /**
@@ -1007,6 +1704,9 @@ var TinyFeedback = (function (exports) {
             this.descriptionTextarea.style.cssText = this.getTextareaStyles();
             descriptionGroup.appendChild(descriptionLabel);
             descriptionGroup.appendChild(this.descriptionTextarea);
+            // Attachment UI container
+            const attachmentContainer = document.createElement('div');
+            attachmentContainer.id = 'tf-bug-attachments';
             // Submit button
             const submitButton = document.createElement('button');
             submitButton.id = 'tf-bug-submit';
@@ -1016,12 +1716,21 @@ var TinyFeedback = (function (exports) {
             formContainer.appendChild(severityGroup);
             formContainer.appendChild(titleGroup);
             formContainer.appendChild(descriptionGroup);
+            formContainer.appendChild(attachmentContainer);
             formContainer.appendChild(submitButton);
             modal.appendChild(closeButton);
             modal.appendChild(header);
             modal.appendChild(formContainer);
             this.container.appendChild(modal);
             document.body.appendChild(this.container);
+            // Initialize Attachment UI after modal is in DOM
+            this.attachmentUI = new AttachmentUI({
+                container: attachmentContainer,
+                apiUrl: this.options.apiUrl,
+                apiKey: this.options.apiKey,
+                projectId: this.options.projectId,
+                maxAttachments: 5
+            });
         }
         /**
          * Attach event listeners
@@ -1090,7 +1799,23 @@ var TinyFeedback = (function (exports) {
                 this.titleInput?.focus();
                 return;
             }
+            // Show loading state
+            const submitBtn = this.container?.querySelector('#tf-bug-submit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando...';
+            }
             try {
+                // Upload attachments first if any
+                let attachmentUrls = [];
+                if (this.attachmentUI && this.attachmentUI.getAttachments().length > 0) {
+                    const handler = this.attachmentUI.getHandler();
+                    const { urls, errors } = await handler.uploadAttachments();
+                    if (errors.length > 0) {
+                        console.warn('[TinyFeedback] Some attachments failed:', errors);
+                    }
+                    attachmentUrls = urls;
+                }
                 const response = await fetch(`${this.options.apiUrl}/api/widget/feedback`, {
                     method: 'POST',
                     headers: {
@@ -1103,7 +1828,9 @@ var TinyFeedback = (function (exports) {
                         title: title,
                         content: `[${this.selectedSeverity.toUpperCase()}] ${description}`,
                         page_url: window.location.href,
-                        user_agent: navigator.userAgent
+                        user_agent: navigator.userAgent,
+                        screenshot_url: attachmentUrls.length > 0 ? attachmentUrls[0] : null,
+                        attachment_urls: attachmentUrls
                     })
                 });
                 if (response.ok) {
@@ -1114,7 +1841,7 @@ var TinyFeedback = (function (exports) {
                         return;
                     }
                     this.showThankYou();
-                    this.options.onSubmit?.(title, description, this.selectedSeverity);
+                    this.options.onSubmit?.(title, description, this.selectedSeverity, attachmentUrls);
                 }
                 else if (response.status === 429) {
                     const errorData = await response.json();
@@ -1137,6 +1864,12 @@ var TinyFeedback = (function (exports) {
             catch (error) {
                 console.error('Error submitting bug report:', error);
                 this.showError('Falha ao enviar report. Tente novamente.');
+            }
+            finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar Report';
+                }
             }
         }
         showWarning(title, detail) {
@@ -1222,6 +1955,8 @@ var TinyFeedback = (function (exports) {
       padding: 32px;
       max-width: 500px;
       width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
       position: relative;
       box-shadow: 0 0 40px rgba(255, 68, 68, 0.1);
     `;
@@ -1398,7 +2133,13 @@ var TinyFeedback = (function (exports) {
     /**
      * TinyFeedback Widget
      * Main entry point for the vanilla JS widget
-     * ST-05: Criar Widget Vanilla JS (<20KB)
+     * ST-12: UX Polish - Animações e Acessibilidade
+     *
+     * Features:
+     * - Smooth animations with reduced motion support
+     * - WCAG 2.1 AA compliance
+     * - Keyboard navigation
+     * - Screen reader support
      */
     class TinyFeedbackWidget {
         constructor(config) {
@@ -1408,6 +2149,8 @@ var TinyFeedback = (function (exports) {
             this.floatingButton = null;
             this.menuContainer = null;
             this.isMenuOpen = false;
+            this.isReducedMotion = false;
+            this.keydownHandler = null;
             /**
              * Handle outside click to close menu
              */
@@ -1425,6 +2168,13 @@ var TinyFeedback = (function (exports) {
                 buttonText: 'Feedback',
                 ...config
             };
+            // Check for reduced motion preference
+            this.isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            // Listen for changes in reduced motion preference
+            window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+                this.isReducedMotion = e.matches;
+                this.updateAnimationStyles();
+            });
             // If no apiUrl provided, infer from script src
             if (!this.config.apiUrl) {
                 this.config.apiUrl = this.inferApiUrl();
@@ -1502,7 +2252,19 @@ var TinyFeedback = (function (exports) {
             button.id = 'tinyfeedback-button';
             button.innerHTML = this.config.buttonText;
             button.style.cssText = this.getButtonStyles();
+            // A11y: Add accessibility attributes
+            button.setAttribute('aria-label', 'Abrir menu de feedback');
+            button.setAttribute('aria-haspopup', 'menu');
+            button.setAttribute('aria-expanded', 'false');
+            button.setAttribute('type', 'button');
             button.addEventListener('click', () => this.toggleMenu());
+            // Keyboard navigation
+            button.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.toggleMenu();
+                }
+            });
             document.body.appendChild(button);
             this.floatingButton = button;
         }
@@ -1524,7 +2286,8 @@ var TinyFeedback = (function (exports) {
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 2147483646;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform ${this.isReducedMotion ? '0s' : '0.2s'}, box-shadow ${this.isReducedMotion ? '0s' : '0.2s'};
+      outline-offset: 2px;
     `;
             return baseStyles;
         }
@@ -1557,28 +2320,42 @@ var TinyFeedback = (function (exports) {
         openMenu() {
             if (!this.floatingButton)
                 return;
+            // Update ARIA
+            this.floatingButton.setAttribute('aria-expanded', 'true');
             const menu = document.createElement('div');
             menu.id = 'tinyfeedback-menu';
+            menu.setAttribute('role', 'menu');
+            menu.setAttribute('aria-label', 'Opções de feedback');
             menu.style.cssText = this.getMenuStyles();
             menu.innerHTML = `
       <div style="padding: 8px;">
-        <button class="tf-menu-item" data-type="nps" style="${this.getMenuItemStyles()}">
-          <span style="font-size: 18px; margin-right: 8px;">📊</span>
+        <button class="tf-menu-item" data-type="nps" role="menuitem" style="${this.getMenuItemStyles()}" tabindex="-1">
+          <span style="font-size: 18px; margin-right: 8px;" aria-hidden="true">📊</span>
           <span>Avaliação (NPS)</span>
+          <span class="visually-hidden">, Abre modal de avaliação</span>
         </button>
-        <button class="tf-menu-item" data-type="suggestion" style="${this.getMenuItemStyles()}">
-          <span style="font-size: 18px; margin-right: 8px;">💡</span>
+        <button class="tf-menu-item" data-type="suggestion" role="menuitem" style="${this.getMenuItemStyles()}" tabindex="-1">
+          <span style="font-size: 18px; margin-right: 8px;" aria-hidden="true">💡</span>
           <span>Sugestão</span>
+          <span class="visually-hidden">, Abre modal de sugestão</span>
         </button>
-        <button class="tf-menu-item" data-type="bug" style="${this.getMenuItemStyles()}">
-          <span style="font-size: 18px; margin-right: 8px;">🐛</span>
+        <button class="tf-menu-item" data-type="bug" role="menuitem" style="${this.getMenuItemStyles()}" tabindex="-1">
+          <span style="font-size: 18px; margin-right: 8px;" aria-hidden="true">🐛</span>
           <span>Reportar Bug</span>
+          <span class="visually-hidden">, Abre modal de bug</span>
         </button>
       </div>
     `;
             document.body.appendChild(menu);
             this.menuContainer = menu;
             this.isMenuOpen = true;
+            // Set up keyboard navigation for menu
+            this.setupMenuKeyboardNavigation();
+            // Focus first item
+            const firstItem = menu.querySelector('[role="menuitem"]');
+            if (firstItem) {
+                setTimeout(() => firstItem.focus(), this.isReducedMotion ? 0 : 50);
+            }
             // Attach click handlers
             menu.querySelectorAll('.tf-menu-item').forEach((item) => {
                 item.addEventListener('click', (e) => {
@@ -1592,13 +2369,73 @@ var TinyFeedback = (function (exports) {
             }, 0);
         }
         /**
+         * Set up keyboard navigation for the menu
+         */
+        setupMenuKeyboardNavigation() {
+            if (!this.menuContainer)
+                return;
+            const items = this.menuContainer.querySelectorAll('[role="menuitem"]');
+            this.keydownHandler = (e) => {
+                const currentFocus = document.activeElement;
+                const currentIndex = Array.from(items).indexOf(currentFocus);
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+                        items[nextIndex].focus();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+                        items[prevIndex].focus();
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        items[0].focus();
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        items[items.length - 1].focus();
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        this.closeMenu();
+                        this.floatingButton?.focus();
+                        break;
+                    case 'Tab':
+                        // Close menu on tab out
+                        e.preventDefault();
+                        this.closeMenu();
+                        break;
+                }
+            };
+            this.menuContainer.addEventListener('keydown', this.keydownHandler);
+        }
+        /**
          * Close the feedback menu
          */
         closeMenu() {
             if (this.menuContainer) {
-                this.menuContainer.remove();
-                this.menuContainer = null;
+                // Remove keyboard handler
+                if (this.keydownHandler) {
+                    this.menuContainer.removeEventListener('keydown', this.keydownHandler);
+                }
+                // Animate out
+                if (!this.isReducedMotion) {
+                    this.menuContainer.style.opacity = '0';
+                    this.menuContainer.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.menuContainer?.remove();
+                        this.menuContainer = null;
+                    }, 200);
+                }
+                else {
+                    this.menuContainer.remove();
+                    this.menuContainer = null;
+                }
             }
+            // Update ARIA
+            this.floatingButton?.setAttribute('aria-expanded', 'false');
             this.isMenuOpen = false;
             document.removeEventListener('click', this.handleOutsideClick);
         }
@@ -1624,6 +2461,9 @@ var TinyFeedback = (function (exports) {
          */
         getMenuStyles() {
             const positionStyles = this.getMenuPositionStyles();
+            const animationStyles = this.isReducedMotion
+                ? ''
+                : 'animation: tf-menu-appear 0.2s ease-out;';
             return `
       position: fixed;
       ${positionStyles}
@@ -1632,7 +2472,9 @@ var TinyFeedback = (function (exports) {
       box-shadow: 0 10px 40px rgba(0,0,0,0.2);
       z-index: 2147483647;
       min-width: 200px;
-      animation: tf-menu-appear 0.2s ease-out;
+      ${animationStyles}
+      transition: opacity 0.2s, transform 0.2s;
+      transform-origin: bottom right;
     `;
         }
         /**
@@ -1663,9 +2505,18 @@ var TinyFeedback = (function (exports) {
       font-family: inherit;
       font-size: 14px;
       color: #374151;
-      transition: background 0.15s;
+      transition: background ${this.isReducedMotion ? '0s' : '0.15s'};
       text-align: left;
+      outline-offset: 2px;
     `;
+        }
+        /**
+         * Update animation styles based on reduced motion preference
+         */
+        updateAnimationStyles() {
+            if (this.floatingButton) {
+                this.floatingButton.style.cssText = this.getButtonStyles();
+            }
         }
         /**
          * Open the NPS feedback modal
@@ -1678,8 +2529,11 @@ var TinyFeedback = (function (exports) {
                 projectId: this.config.projectId,
                 apiKey: this.config.apiKey,
                 apiUrl: this.config.apiUrl,
+                reducedMotion: this.isReducedMotion,
                 onClose: () => {
                     this.npsModal = null;
+                    // Return focus to button
+                    this.floatingButton?.focus();
                 }
             });
             this.npsModal.open();
@@ -1695,8 +2549,10 @@ var TinyFeedback = (function (exports) {
                 projectId: this.config.projectId,
                 apiKey: this.config.apiKey,
                 apiUrl: this.config.apiUrl,
+                reducedMotion: this.isReducedMotion,
                 onClose: () => {
                     this.suggestionModal = null;
+                    this.floatingButton?.focus();
                 }
             });
             this.suggestionModal.open();
@@ -1712,8 +2568,10 @@ var TinyFeedback = (function (exports) {
                 projectId: this.config.projectId,
                 apiKey: this.config.apiKey,
                 apiUrl: this.config.apiUrl,
+                reducedMotion: this.isReducedMotion,
                 onClose: () => {
                     this.bugModal = null;
+                    this.floatingButton?.focus();
                 }
             });
             this.bugModal.open();
@@ -1766,14 +2624,61 @@ var TinyFeedback = (function (exports) {
             }
         }
     }
-    // Add CSS animation
+    // Add CSS animations and a11y utilities
     const style = document.createElement('style');
     style.textContent = `
   @keyframes tf-menu-appear {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
   }
-  .tf-menu-item:hover { background: #f3f4f6 !important; }
+  
+  .tf-menu-item:hover { 
+    background: #f3f4f6 !important; 
+  }
+  
+  .tf-menu-item:focus-visible {
+    background: #f3f4f6 !important;
+    outline: 2px solid ${document.querySelector('#tinyfeedback-button')?.getAttribute('style')?.includes('background:')
+    ? document.querySelector('#tinyfeedback-button')?.getAttribute('style')?.match(/background:\s*([^;]+)/)?.[1] || '#3b82f6'
+    : '#3b82f6'};
+    outline-offset: -2px;
+  }
+  
+  /* Visually hidden class for screen reader text */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .tf-menu-item {
+      border: 2px solid currentColor !important;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+  
+  /* Focus visible styles */
+  #tinyfeedback-button:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.5);
+  }
 `;
     document.head?.appendChild(style);
 

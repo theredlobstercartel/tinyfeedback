@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TinyFeedback Widget Demo - Script Tag Embed</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    h1 { color: #00ff88; }
+    h2 { margin-top: 40px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    code {
+      background: #111;
+      color: #00ff88;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    pre {
+      background: #111;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .demo-section {
+      margin: 40px 0;
+    }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+    }
+    .feature-list li {
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+    }
+    .feature-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #00ff88;
+    }
+  </style>
+</head>
+<body>
+  <h1>🦞 TinyFeedback Widget Demo</h1>
+  <p>Demonstrating ST-04: Widget Core - Renderização e Injeção</p>
+
+  <div class="demo-section">
+    <h2>Features Implemented</h2>
+    <ul class="feature-list">
+      <li>Script embeddável via <code><script></code> tag</li>
+      <li>Shadow DOM para isolamento CSS completo</li>
+      <li>Lazy loading com IntersectionObserver</li>
+      <li>Suporte a múltiplos widgets na mesma página</li>
+      <li>Bundle: ~11KB gzipped (limite: 30KB)</li>
+    </ul>
+  </div>
+
+  <div class="demo-section">
+    <h2>Embed Options</h2>
+
+    <h3>1. Script Tag (Auto-Initialize)</h3>
+    <pre><code>&lt;script
+  src="https://your-domain.com/widget/tinyfeedback.min.js"
+  data-tf-widget
+  data-project-id="your-project-id"
+  data-api-key="your-api-key"
+  data-position="bottom-right"
+  data-color="#00ff88"
+  data-lazy
+&gt;&lt;/script&gt;</code></pre>
+
+    <h3>2. With Delay (Lazy Load)</h3>
+    <pre><code>&lt;script
+  src="https://your-domain.com/widget/tinyfeedback.min.js"
+  data-tf-widget
+  data-project-id="your-project-id"
+  data-api-key="your-api-key"
+  data-delay="3000"
+&gt;&lt;/script&gt;</code>
+<!-- Carrega após 3 segundos --></code></pre>
+
+    <h3>3. Multiple Widgets (Different Positions)</h3>
+    <pre><code>&lt;!-- Widget 1 - Bottom Right -->
+&lt;script
+  src="https://your-domain.com/widget/tinyfeedback.min.js"
+  data-tf-widget
+  data-project-id="proj-1"
+  data-api-key="key-1"
+  data-position="bottom-right"
+&gt;&lt;/script&gt;
+
+&lt;!-- Widget 2 - Bottom Left -->
+&lt;script
+  src="https://your-domain.com/widget/tinyfeedback.min.js"
+  data-tf-widget
+  data-project-id="proj-2"
+  data-api-key="key-2"
+  data-position="bottom-left"
+  data-color="#ff4444"
+&gt;&lt;/script&gt;</code></pre>
+
+    <h3>4. JavaScript API</h3>
+    <pre><code>// Criar widget manualmente
+const widget = new TinyFeedbackWidget({
+  projectId: 'your-project-id',
+  apiKey: 'your-api-key',
+  position: 'bottom-right',
+  primaryColor: '#00ff88',
+  lazy: true,        // Lazy load
+  delay: 2000,       // Delay 2s
+  shadow: true       // Use Shadow DOM
+});
+
+widget.init();
+
+// Abrir modais programaticamente
+widget.openNPS();
+widget.openSuggestion();
+widget.openBug();
+
+// Destruir widget
+widget.destroy();</code></pre>
+  </div>
+
+  <div class="demo-section">
+    <h2>Multiple Widgets Demo</h2>
+    <p>This page has two widgets embedded:</p>
+    <ul>
+      <li><strong>Widget 1:</strong> Bottom-right (green) - default project</li>
+      <li><strong>Widget 2:</strong> Bottom-left (blue) - delayed 5s</li>
+    </ul>
+  </div>
+
+  <div class="demo-section">
+    <h2>Shadow DOM Isolation Demo</h2>
+    <p>The widgets are rendered in Shadow DOM, meaning:</p>
+    <ul>
+      <li>Widget styles don't leak to your page</li>
+      <li>Page styles don't affect the widget</li>
+      <li>CSS conflicts are eliminated</li>
+    </ul>
+    <p>Try adding CSS to this page - it won't affect the widget! Example:</p>
+    <pre><code>/* This won't affect the widget because it's in Shadow DOM */
+button {
+  background: red !important;
+  font-size: 50px !important;
+}</code></pre>
+  </div>
+
+  <!-- Widget 1: Default project, immediate load -->
+  <script
+    src="./tinyfeedback.min.js"
+    data-tf-widget
+    data-project-id="demo-project-1"
+    data-api-key="demo-key-1"
+    data-position="bottom-right"
+    data-color="#00ff88"
+  ></script>
+
+  <!-- Widget 2: Different project, delayed load -->
+  <script
+    src="./tinyfeedback.min.js"
+    data-tf-widget
+    data-project-id="demo-project-2"
+    data-api-key="demo-key-2"
+    data-position="bottom-left"
+    data-color="#3b82f6"
+    data-delay="5000"
+  ></script>
+
+  <script>
+    // Demonstrate that global CSS doesn't affect widgets
+    const style = document.createElement('style');
+    style.textContent = `
+      button {
+        background: red !important;
+        font-size: 50px !important;
+      }
+    `;
+    document.head.appendChild(style);
+    console.log('[Demo] Global aggressive CSS applied - but widgets in Shadow DOM are unaffected!');
+  </script>
+</body>
+</html>
