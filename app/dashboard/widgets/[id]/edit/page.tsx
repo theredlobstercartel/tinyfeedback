@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,42 +28,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
-
-// Widget configuration interface
-interface WidgetConfig {
-  id: string;
-  project_id: string;
-  name: string;
-  description: string | null;
-  
-  // Appearance
-  primary_color: string;
-  background_color: string;
-  position: WidgetPosition;
-  
-  // Behavior
-  trigger_type: TriggerType;
-  trigger_value: number | null;
-  animation: AnimationType;
-  
-  // Features
-  enable_nps: boolean;
-  enable_suggestions: boolean;
-  enable_bugs: boolean;
-  is_active: boolean;
-  
-  // Text customization
-  title: string;
-  subtitle: string | null;
-  thank_you_message: string;
-  placeholder_text: string;
-  submit_button_text: string;
-  cancel_button_text: string;
-}
-
-type WidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
-type TriggerType = 'click' | 'scroll' | 'time' | 'hover';
-type AnimationType = 'fade' | 'slide' | 'scale' | 'bounce';
+import type { Widget, WidgetPosition, WidgetTriggerType } from '@/types';
 
 const POSITIONS: { value: WidgetPosition; label: string; icon: string }[] = [
   { value: 'bottom-right', label: 'Inferior Direito', icon: '↘' },
@@ -73,23 +37,15 @@ const POSITIONS: { value: WidgetPosition; label: string; icon: string }[] = [
   { value: 'top-left', label: 'Superior Esquerdo', icon: '↖' },
 ];
 
-const TRIGGERS: { value: TriggerType; label: string; description: string }[] = [
-  { value: 'click', label: 'Clique', description: 'Abre ao clicar no botão' },
-  { value: 'scroll', label: 'Scroll', description: 'Abre após rolar X% da página' },
-  { value: 'time', label: 'Tempo', description: 'Abre após X segundos' },
-  { value: 'hover', label: 'Hover', description: 'Abre ao passar o mouse' },
-];
-
-const ANIMATIONS: { value: AnimationType; label: string }[] = [
-  { value: 'fade', label: 'Fade' },
-  { value: 'slide', label: 'Slide' },
-  { value: 'scale', label: 'Scale' },
-  { value: 'bounce', label: 'Bounce' },
+const TRIGGER_TYPES: { value: WidgetTriggerType; label: string; description: string }[] = [
+  { value: 'button', label: 'Botão', description: 'Abre ao clicar no botão' },
+  { value: 'auto', label: 'Automático', description: 'Abre automaticamente' },
+  { value: 'event', label: 'Evento', description: 'Abre via evento customizado' },
 ];
 
 const PRESET_COLORS = [
-  '#00ff88', // Neon Green (default)
   '#3b82f6', // Blue
+  '#00ff88', // Neon Green
   '#8b5cf6', // Purple
   '#ec4899', // Pink
   '#f59e0b', // Amber
@@ -101,17 +57,11 @@ const PRESET_COLORS = [
 ];
 
 // Default configuration
-const DEFAULT_CONFIG: WidgetConfig = {
-  id: '',
-  project_id: '',
+const DEFAULT_WIDGET: Partial<Widget> = {
   name: '',
-  description: null,
-  primary_color: '#00ff88',
-  background_color: '#0a0a0a',
+  primary_color: '#3b82f6',
   position: 'bottom-right',
-  trigger_type: 'click',
-  trigger_value: null,
-  animation: 'fade',
+  trigger_type: 'button',
   enable_nps: true,
   enable_suggestions: true,
   enable_bugs: true,
@@ -119,36 +69,31 @@ const DEFAULT_CONFIG: WidgetConfig = {
   title: 'Queremos seu feedback!',
   subtitle: null,
   thank_you_message: 'Obrigado pelo feedback!',
-  placeholder_text: 'Descreva sua experiência...',
-  submit_button_text: 'Enviar',
-  cancel_button_text: 'Cancelar',
 };
 
 export default function WidgetEditPage() {
   const params = useParams();
   const router = useRouter();
   const widgetId = params.id as string;
-  
+
   const [user, setUser] = useState<User | null>(null);
-  const [config, setConfig] = useState<WidgetConfig>(DEFAULT_CONFIG);
-  const [originalConfig, setOriginalConfig] = useState<WidgetConfig>(DEFAULT_CONFIG);
+  const [widget, setWidget] = useState<Widget | null>(null);
+  const [formData, setFormData] = useState<Partial<Widget>>(DEFAULT_WIDGET);
+  const [originalData, setOriginalData] = useState<Partial<Widget>>(DEFAULT_WIDGET);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeTab, setActiveTab] = useState('appearance');
-  
-  // Debounce ref for preview updates
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load widget configuration
   useEffect(() => {
     const loadData = async () => {
       const supabase = createClient();
-      
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      
+
       if (!user) {
         router.push('/login');
         return;
@@ -158,14 +103,15 @@ export default function WidgetEditPage() {
       try {
         const response = await fetch(`/api/widgets/${widgetId}`);
         const result = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(result.error || 'Erro ao carregar configurações');
         }
 
-        const loadedConfig = { ...DEFAULT_CONFIG, ...result.data };
-        setConfig(loadedConfig);
-        setOriginalConfig(loadedConfig);
+        const loadedWidget = result.data as Widget;
+        setWidget(loadedWidget);
+        setFormData(loadedWidget);
+        setOriginalData(loadedWidget);
       } catch (error) {
         console.error('Error loading widget:', error);
         toast.error('Erro ao carregar configurações do widget');
@@ -179,9 +125,9 @@ export default function WidgetEditPage() {
 
   // Check for unsaved changes
   useEffect(() => {
-    const hasChanges = JSON.stringify(config) !== JSON.stringify(originalConfig);
+    const hasChanges = JSON.stringify(formData) !== JSON.stringify(originalData);
     setHasUnsavedChanges(hasChanges);
-  }, [config, originalConfig]);
+  }, [formData, originalData]);
 
   // Handle beforeunload for unsaved changes
   useEffect(() => {
@@ -202,29 +148,18 @@ export default function WidgetEditPage() {
     router.push('/login');
   };
 
-  // Debounced config update for preview
-  const debouncedUpdate = useCallback((updater: (prev: WidgetConfig) => WidgetConfig) => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    
-    debounceRef.current = setTimeout(() => {
-      setConfig(updater);
-    }, 100);
-  }, []);
-
-  const updateConfig = useCallback((updates: Partial<WidgetConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+  const updateFormData = useCallback((updates: Partial<Widget>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
-    
+
     try {
       const response = await fetch(`/api/widgets/${widgetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(formData),
       });
 
       const result = await response.json();
@@ -233,7 +168,7 @@ export default function WidgetEditPage() {
         throw new Error(result.error || 'Erro ao salvar configurações');
       }
 
-      setOriginalConfig(config);
+      setOriginalData(formData);
       toast.success('Configurações salvas com sucesso!');
     } catch (error) {
       console.error('Error saving widget:', error);
@@ -245,18 +180,19 @@ export default function WidgetEditPage() {
 
   const handleRevert = () => {
     if (confirm('Tem certeza que deseja reverter todas as alterações?')) {
-      setConfig(originalConfig);
+      setFormData(originalData);
       toast.info('Alterações revertidas');
     }
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(config, null, 2);
+    if (!formData) return;
+    const dataStr = JSON.stringify(formData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `widget-config-${config.name || widgetId}.json`;
+    link.download = `widget-config-${formData.name || widgetId}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -279,11 +215,11 @@ export default function WidgetEditPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       {/* Header */}
-      <header 
+      <header
         className="sticky top-0 z-50 border-b"
-        style={{ 
-          backgroundColor: '#0a0a0a', 
-          borderColor: '#222222' 
+        style={{
+          backgroundColor: '#0a0a0a',
+          borderColor: '#222222'
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -309,22 +245,22 @@ export default function WidgetEditPage() {
                 <ArrowLeft size={20} />
               </a>
               <div>
-                <h1 
+                <h1
                   className="text-xl font-bold"
                   style={{ color: '#00ff88' }}
                 >
                   Editar Widget
                 </h1>
                 <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                  {config.name || 'Carregando...'}
+                  {formData.name || 'Carregando...'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               {hasUnsavedChanges && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="hidden sm:flex items-center gap-1"
                   style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
                 >
@@ -332,7 +268,7 @@ export default function WidgetEditPage() {
                   Alterações não salvas
                 </Badge>
               )}
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -408,10 +344,10 @@ export default function WidgetEditPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {hasUnsavedChanges && (
-          <Alert 
+          <Alert
             className="mb-6"
-            style={{ 
-              backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+            style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
               borderColor: '#f59e8b',
               color: '#f59e0b'
             }}
@@ -428,56 +364,56 @@ export default function WidgetEditPage() {
           {/* Left Column - Settings */}
           <div className="lg:col-span-2 space-y-6">
             {/* Status Card */}
-            <div 
+            <div
               className="p-4 flex items-center justify-between"
-              style={{ 
-                backgroundColor: '#0a0a0a', 
-                border: '1px solid #222222' 
+              style={{
+                backgroundColor: '#0a0a0a',
+                border: '1px solid #222222'
               }}
             >
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-3 h-3 rounded-full"
-                  style={{ 
-                    backgroundColor: config.is_active ? '#00ff88' : '#ff4444',
-                    boxShadow: config.is_active ? '0 0 10px #00ff88' : 'none'
+                  style={{
+                    backgroundColor: formData.is_active ? '#00ff88' : '#ff4444',
+                    boxShadow: formData.is_active ? '0 0 10px #00ff88' : 'none'
                   }}
                 />
                 <span style={{ color: '#ffffff' }}>
-                  Widget {config.is_active ? 'Ativo' : 'Inativo'}
+                  Widget {formData.is_active ? 'Ativo' : 'Inativo'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <span style={{ color: '#888888', fontSize: '0.875rem' }}>
-                  {config.is_active ? 'Visível no site' : 'Oculto'}
+                  {formData.is_active ? 'Visível no site' : 'Oculto'}
                 </span>
                 <Switch
-                  checked={config.is_active}
-                  onCheckedChange={(checked) => updateConfig({ is_active: checked })}
+                  checked={formData.is_active ?? true}
+                  onCheckedChange={(checked) => updateFormData({ is_active: checked })}
                 />
               </div>
             </div>
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList 
+              <TabsList
                 className="grid w-full grid-cols-3"
-                style={{ 
-                  backgroundColor: '#0a0a0a', 
-                  border: '1px solid #222222' 
+                style={{
+                  backgroundColor: '#0a0a0a',
+                  border: '1px solid #222222'
                 }}
               >
-                <TabsTrigger 
+                <TabsTrigger
                   value="appearance"
                   className="flex items-center gap-2 data-[state=active]:text-black"
-                  style={{ 
+                  style={{
                     color: '#888888',
                   }}
                 >
                   <Palette size={16} />
                   Aparência
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="behavior"
                   className="flex items-center gap-2 data-[state=active]:text-black"
                   style={{ color: '#888888' }}
@@ -485,7 +421,7 @@ export default function WidgetEditPage() {
                   <Settings size={16} />
                   Comportamento
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="texts"
                   className="flex items-center gap-2 data-[state=active]:text-black"
                   style={{ color: '#888888' }}
@@ -498,11 +434,11 @@ export default function WidgetEditPage() {
               {/* Appearance Tab */}
               <TabsContent value="appearance" className="mt-6 space-y-6">
                 {/* Name */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -515,8 +451,8 @@ export default function WidgetEditPage() {
                   </div>
                   <Input
                     id="name"
-                    value={config.name}
-                    onChange={(e) => updateConfig({ name: e.target.value })}
+                    value={formData.name || ''}
+                    onChange={(e) => updateFormData({ name: e.target.value })}
                     placeholder="Meu Widget"
                     maxLength={100}
                     className="w-full"
@@ -528,44 +464,12 @@ export default function WidgetEditPage() {
                   />
                 </div>
 
-                {/* Description */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="description" style={{ color: '#ffffff' }}>
-                      Descrição
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Descrição interna para referência
-                    </p>
-                  </div>
-                  <Textarea
-                    id="description"
-                    value={config.description || ''}
-                    onChange={(e) => updateConfig({ description: e.target.value || null })}
-                    placeholder="Descrição opcional..."
-                    maxLength={500}
-                    rows={3}
-                    className="w-full resize-none"
-                    style={{
-                      backgroundColor: '#000000',
-                      borderColor: '#333333',
-                      color: '#ffffff',
-                    }}
-                  />
-                </div>
-
                 {/* Primary Color */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -576,18 +480,18 @@ export default function WidgetEditPage() {
                       Cor principal dos botões e elementos de destaque
                     </p>
                   </div>
-                  
+
                   {/* Preset Colors */}
                   <div className="flex flex-wrap gap-2">
                     {PRESET_COLORS.map((color) => (
                       <button
                         key={color}
-                        onClick={() => updateConfig({ primary_color: color })}
+                        onClick={() => updateFormData({ primary_color: color })}
                         className="w-10 h-10 transition-all"
                         style={{
                           backgroundColor: color,
-                          border: config.primary_color === color ? '3px solid #ffffff' : '2px solid transparent',
-                          transform: config.primary_color === color ? 'scale(1.1)' : 'scale(1)',
+                          border: formData.primary_color === color ? '3px solid #ffffff' : '2px solid transparent',
+                          transform: formData.primary_color === color ? 'scale(1.1)' : 'scale(1)',
                         }}
                         aria-label={`Selecionar cor ${color}`}
                       />
@@ -598,69 +502,21 @@ export default function WidgetEditPage() {
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={config.primary_color}
-                      onChange={(e) => updateConfig({ primary_color: e.target.value })}
+                      value={formData.primary_color || '#3b82f6'}
+                      onChange={(e) => updateFormData({ primary_color: e.target.value })}
                       className="w-10 h-10 cursor-pointer border-0 p-0"
                       style={{ backgroundColor: 'transparent' }}
                     />
                     <Input
                       type="text"
-                      value={config.primary_color}
+                      value={formData.primary_color || ''}
                       onChange={(e) => {
                         const value = e.target.value;
                         if (isValidHexColor(value)) {
-                          updateConfig({ primary_color: value });
+                          updateFormData({ primary_color: value });
                         }
                       }}
-                      placeholder="#00ff88"
-                      className="w-28"
-                      style={{
-                        backgroundColor: '#000000',
-                        borderColor: '#333333',
-                        color: '#ffffff',
-                      }}
-                    />
-                    <span style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      HEX
-                    </span>
-                  </div>
-                </div>
-
-                {/* Background Color */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label style={{ color: '#ffffff' }}>
-                      Cor de Fundo
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Cor de fundo do modal de feedback
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={config.background_color}
-                      onChange={(e) => updateConfig({ background_color: e.target.value })}
-                      className="w-10 h-10 cursor-pointer border-0 p-0"
-                      style={{ backgroundColor: 'transparent' }}
-                    />
-                    <Input
-                      type="text"
-                      value={config.background_color}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (isValidHexColor(value)) {
-                          updateConfig({ background_color: value });
-                        }
-                      }}
-                      placeholder="#0a0a0a"
+                      placeholder="#3b82f6"
                       className="w-28"
                       style={{
                         backgroundColor: '#000000',
@@ -675,11 +531,11 @@ export default function WidgetEditPage() {
                 </div>
 
                 {/* Position */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -690,29 +546,29 @@ export default function WidgetEditPage() {
                       Onde o botão do widget aparecerá
                     </p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     {POSITIONS.map((position) => (
                       <button
                         key={position.value}
-                        onClick={() => updateConfig({ position: position.value })}
+                        onClick={() => updateFormData({ position: position.value })}
                         className="flex items-center gap-3 p-3 transition-all"
                         style={{
-                          backgroundColor: config.position === position.value ? 'rgba(0, 255, 136, 0.1)' : '#000000',
-                          border: `1px solid ${config.position === position.value ? '#00ff88' : '#333333'}`,
+                          backgroundColor: formData.position === position.value ? 'rgba(0, 255, 136, 0.1)' : '#000000',
+                          border: `1px solid ${formData.position === position.value ? '#00ff88' : '#333333'}`,
                         }}
                       >
-                        <span 
+                        <span
                           className="text-lg"
-                          style={{ 
-                            color: config.position === position.value ? '#00ff88' : '#888888',
+                          style={{
+                            color: formData.position === position.value ? '#00ff88' : '#888888',
                           }}
                         >
                           {position.icon}
                         </span>
-                        <span 
-                          style={{ 
-                            color: config.position === position.value ? '#00ff88' : '#ffffff',
+                        <span
+                          style={{
+                            color: formData.position === position.value ? '#00ff88' : '#ffffff',
                             fontSize: '0.875rem',
                           }}
                         >
@@ -727,37 +583,37 @@ export default function WidgetEditPage() {
               {/* Behavior Tab */}
               <TabsContent value="behavior" className="mt-6 space-y-6">
                 {/* Trigger Type */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
                     <Label style={{ color: '#ffffff' }}>
-                      Gatilho de Abertura
+                      Tipo de Gatilho
                     </Label>
                     <p style={{ color: '#888888', fontSize: '0.875rem' }}>
                       Como o widget será aberto
                     </p>
                   </div>
-                  
+
                   <div className="space-y-2">
-                    {TRIGGERS.map((trigger) => (
+                    {TRIGGER_TYPES.map((trigger) => (
                       <button
                         key={trigger.value}
-                        onClick={() => updateConfig({ trigger_type: trigger.value })}
+                        onClick={() => updateFormData({ trigger_type: trigger.value })}
                         className="w-full flex items-center justify-between p-3 transition-all text-left"
                         style={{
-                          backgroundColor: config.trigger_type === trigger.value ? 'rgba(0, 255, 136, 0.1)' : '#000000',
-                          border: `1px solid ${config.trigger_type === trigger.value ? '#00ff88' : '#333333'}`,
+                          backgroundColor: formData.trigger_type === trigger.value ? 'rgba(0, 255, 136, 0.1)' : '#000000',
+                          border: `1px solid ${formData.trigger_type === trigger.value ? '#00ff88' : '#333333'}`,
                         }}
                       >
                         <div>
-                          <span 
-                            style={{ 
-                              color: config.trigger_type === trigger.value ? '#00ff88' : '#ffffff',
+                          <span
+                            style={{
+                              color: formData.trigger_type === trigger.value ? '#00ff88' : '#ffffff',
                               fontSize: '0.875rem',
                               fontWeight: 500,
                             }}
@@ -768,51 +624,7 @@ export default function WidgetEditPage() {
                             {trigger.description}
                           </p>
                         </div>
-                        {config.trigger_type === trigger.value && (
-                          <Check size={16} style={{ color: '#00ff88' }} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Animation */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label style={{ color: '#ffffff' }}>
-                      Animação
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Estilo de animação ao abrir o widget
-                    </p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    {ANIMATIONS.map((animation) => (
-                      <button
-                        key={animation.value}
-                        onClick={() => updateConfig({ animation: animation.value })}
-                        className="flex items-center justify-between p-3 transition-all"
-                        style={{
-                          backgroundColor: config.animation === animation.value ? 'rgba(0, 255, 136, 0.1)' : '#000000',
-                          border: `1px solid ${config.animation === animation.value ? '#00ff88' : '#333333'}`,
-                        }}
-                      >
-                        <span 
-                          style={{ 
-                            color: config.animation === animation.value ? '#00ff88' : '#ffffff',
-                            fontSize: '0.875rem',
-                          }}
-                        >
-                          {animation.label}
-                        </span>
-                        {config.animation === animation.value && (
+                        {formData.trigger_type === trigger.value && (
                           <Check size={16} style={{ color: '#00ff88' }} />
                         )}
                       </button>
@@ -821,11 +633,11 @@ export default function WidgetEditPage() {
                 </div>
 
                 {/* Feature Toggles */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -836,7 +648,7 @@ export default function WidgetEditPage() {
                       Quais tipos de feedback serão aceitos
                     </p>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -848,8 +660,8 @@ export default function WidgetEditPage() {
                         </p>
                       </div>
                       <Switch
-                        checked={config.enable_nps}
-                        onCheckedChange={(checked) => updateConfig({ enable_nps: checked })}
+                        checked={formData.enable_nps ?? true}
+                        onCheckedChange={(checked) => updateFormData({ enable_nps: checked })}
                       />
                     </div>
 
@@ -863,8 +675,8 @@ export default function WidgetEditPage() {
                         </p>
                       </div>
                       <Switch
-                        checked={config.enable_suggestions}
-                        onCheckedChange={(checked) => updateConfig({ enable_suggestions: checked })}
+                        checked={formData.enable_suggestions ?? true}
+                        onCheckedChange={(checked) => updateFormData({ enable_suggestions: checked })}
                       />
                     </div>
 
@@ -878,8 +690,8 @@ export default function WidgetEditPage() {
                         </p>
                       </div>
                       <Switch
-                        checked={config.enable_bugs}
-                        onCheckedChange={(checked) => updateConfig({ enable_bugs: checked })}
+                        checked={formData.enable_bugs ?? true}
+                        onCheckedChange={(checked) => updateFormData({ enable_bugs: checked })}
                       />
                     </div>
                   </div>
@@ -889,11 +701,11 @@ export default function WidgetEditPage() {
               {/* Texts Tab */}
               <TabsContent value="texts" className="mt-6 space-y-6">
                 {/* Title */}
-                <div 
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -906,39 +718,9 @@ export default function WidgetEditPage() {
                   </div>
                   <Input
                     id="title"
-                    value={config.title}
-                    onChange={(e) => updateConfig({ title: e.target.value })}
+                    value={formData.title || ''}
+                    onChange={(e) => updateFormData({ title: e.target.value })}
                     placeholder="Queremos seu feedback!"
-                    maxLength={100}
-                    style={{
-                      backgroundColor: '#000000',
-                      borderColor: '#333333',
-                      color: '#ffffff',
-                    }}
-                  />
-                </div>
-
-                {/* Subtitle */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="subtitle" style={{ color: '#ffffff' }}>
-                      Subtítulo
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Texto secundário abaixo do título
-                    </p>
-                  </div>
-                  <Input
-                    id="subtitle"
-                    value={config.subtitle || ''}
-                    onChange={(e) => updateConfig({ subtitle: e.target.value || null })}
-                    placeholder="Sua opinião é importante para nós"
                     maxLength={200}
                     style={{
                       backgroundColor: '#000000',
@@ -948,12 +730,42 @@ export default function WidgetEditPage() {
                   />
                 </div>
 
-                {/* Thank You Message */}
-                <div 
+                {/* Subtitle */}
+                <div
                   className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
+                  }}
+                >
+                  <div>
+                    <Label htmlFor="subtitle" style={{ color: '#ffffff' }}>
+                      Subtítulo
+                    </Label>
+                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
+                      Texto secundário abaixo do título (opcional)
+                    </p>
+                  </div>
+                  <Input
+                    id="subtitle"
+                    value={formData.subtitle || ''}
+                    onChange={(e) => updateFormData({ subtitle: e.target.value || null })}
+                    placeholder="Sua opinião é importante para nós"
+                    maxLength={500}
+                    style={{
+                      backgroundColor: '#000000',
+                      borderColor: '#333333',
+                      color: '#ffffff',
+                    }}
+                  />
+                </div>
+
+                {/* Thank You Message */}
+                <div
+                  className="p-6 space-y-4"
+                  style={{
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #222222'
                   }}
                 >
                   <div>
@@ -966,102 +778,12 @@ export default function WidgetEditPage() {
                   </div>
                   <Textarea
                     id="thank_you_message"
-                    value={config.thank_you_message}
-                    onChange={(e) => updateConfig({ thank_you_message: e.target.value })}
+                    value={formData.thank_you_message || ''}
+                    onChange={(e) => updateFormData({ thank_you_message: e.target.value })}
                     placeholder="Obrigado pelo feedback!"
-                    maxLength={200}
+                    maxLength={300}
                     rows={2}
                     className="resize-none"
-                    style={{
-                      backgroundColor: '#000000',
-                      borderColor: '#333333',
-                      color: '#ffffff',
-                    }}
-                  />
-                </div>
-
-                {/* Placeholder */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="placeholder_text" style={{ color: '#ffffff' }}>
-                      Placeholder do Campo de Texto
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Texto de dica no campo de descrição
-                    </p>
-                  </div>
-                  <Input
-                    id="placeholder_text"
-                    value={config.placeholder_text}
-                    onChange={(e) => updateConfig({ placeholder_text: e.target.value })}
-                    placeholder="Descreva sua experiência..."
-                    maxLength={200}
-                    style={{
-                      backgroundColor: '#000000',
-                      borderColor: '#333333',
-                      color: '#ffffff',
-                    }}
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="submit_button_text" style={{ color: '#ffffff' }}>
-                      Texto do Botão Enviar
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Texto do botão de envio do feedback
-                    </p>
-                  </div>
-                  <Input
-                    id="submit_button_text"
-                    value={config.submit_button_text}
-                    onChange={(e) => updateConfig({ submit_button_text: e.target.value })}
-                    placeholder="Enviar"
-                    maxLength={50}
-                    style={{
-                      backgroundColor: '#000000',
-                      borderColor: '#333333',
-                      color: '#ffffff',
-                    }}
-                  />
-                </div>
-
-                {/* Cancel Button */}
-                <div 
-                  className="p-6 space-y-4"
-                  style={{ 
-                    backgroundColor: '#0a0a0a', 
-                    border: '1px solid #222222' 
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="cancel_button_text" style={{ color: '#ffffff' }}>
-                      Texto do Botão Cancelar
-                    </Label>
-                    <p style={{ color: '#888888', fontSize: '0.875rem' }}>
-                      Texto do botão de cancelar
-                    </p>
-                  </div>
-                  <Input
-                    id="cancel_button_text"
-                    value={config.cancel_button_text}
-                    onChange={(e) => updateConfig({ cancel_button_text: e.target.value })}
-                    placeholder="Cancelar"
-                    maxLength={50}
                     style={{
                       backgroundColor: '#000000',
                       borderColor: '#333333',
@@ -1076,11 +798,11 @@ export default function WidgetEditPage() {
           {/* Right Column - Preview */}
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-4">
-              <div 
+              <div
                 className="p-4"
-                style={{ 
-                  backgroundColor: '#0a0a0a', 
-                  border: '1px solid #222222' 
+                style={{
+                  backgroundColor: '#0a0a0a',
+                  border: '1px solid #222222'
                 }}
               >
                 <div className="flex items-center gap-2 mb-4">
@@ -1095,9 +817,9 @@ export default function WidgetEditPage() {
               </div>
 
               {/* Preview Container */}
-              <div 
+              <div
                 className="relative overflow-hidden"
-                style={{ 
+                style={{
                   backgroundColor: '#000000',
                   border: '1px solid #333333',
                   height: '500px',
@@ -1117,38 +839,36 @@ export default function WidgetEditPage() {
                 <div
                   className="absolute px-4 py-3 font-medium text-sm transition-all cursor-pointer"
                   style={{
-                    backgroundColor: config.is_active ? config.primary_color : '#666666',
+                    backgroundColor: formData.is_active ? formData.primary_color : '#666666',
                     color: '#000000',
-                    opacity: config.is_active ? 1 : 0.5,
-                    ...(config.position === 'bottom-right' && { right: '16px', bottom: '16px' }),
-                    ...(config.position === 'bottom-left' && { left: '16px', bottom: '16px' }),
-                    ...(config.position === 'top-right' && { right: '16px', top: '16px' }),
-                    ...(config.position === 'top-left' && { left: '16px', top: '16px' }),
-                    animation: config.animation === 'bounce' ? 'bounce 2s infinite' : 'none',
+                    opacity: formData.is_active ? 1 : 0.5,
+                    ...(formData.position === 'bottom-right' && { right: '16px', bottom: '16px' }),
+                    ...(formData.position === 'bottom-left' && { left: '16px', bottom: '16px' }),
+                    ...(formData.position === 'top-right' && { right: '16px', top: '16px' }),
+                    ...(formData.position === 'top-left' && { left: '16px', top: '16px' }),
                   }}
                 >
-                  {config.title || 'Feedback'}
+                  {formData.title || 'Feedback'}
                 </div>
 
                 {/* Widget Modal Preview */}
-                {config.is_active && (
-                  <div 
+                {formData.is_active && (
+                  <div
                     className="absolute inset-8 p-4 flex flex-col"
                     style={{
-                      backgroundColor: config.background_color,
-                      border: `1px solid ${config.primary_color}40`,
-                      animation: `${config.animation}In 0.3s ease-out`,
+                      backgroundColor: '#0a0a0a',
+                      border: `1px solid ${formData.primary_color}40`,
                     }}
                   >
                     {/* Modal Header */}
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h4 style={{ color: config.primary_color, fontWeight: 600 }}>
-                          {config.title}
+                        <h4 style={{ color: formData.primary_color, fontWeight: 600 }}>
+                          {formData.title}
                         </h4>
-                        {config.subtitle && (
+                        {formData.subtitle && (
                           <p style={{ color: '#888888', fontSize: '0.75rem' }}>
-                            {config.subtitle}
+                            {formData.subtitle}
                           </p>
                         )}
                       </div>
@@ -1157,22 +877,22 @@ export default function WidgetEditPage() {
 
                     {/* Feedback Type Tabs */}
                     <div className="flex gap-2 mb-4">
-                      {config.enable_nps && (
-                        <span 
+                      {formData.enable_nps && (
+                        <span
                           className="px-3 py-1 text-xs"
-                          style={{ 
-                            backgroundColor: `${config.primary_color}20`,
-                            color: config.primary_color,
-                            border: `1px solid ${config.primary_color}40`,
+                          style={{
+                            backgroundColor: `${formData.primary_color}20`,
+                            color: formData.primary_color,
+                            border: `1px solid ${formData.primary_color}40`,
                           }}
                         >
                           NPS
                         </span>
                       )}
-                      {config.enable_suggestions && (
-                        <span 
+                      {formData.enable_suggestions && (
+                        <span
                           className="px-3 py-1 text-xs"
-                          style={{ 
+                          style={{
                             backgroundColor: '#333333',
                             color: '#888888',
                           }}
@@ -1180,10 +900,10 @@ export default function WidgetEditPage() {
                           Sugestão
                         </span>
                       )}
-                      {config.enable_bugs && (
-                        <span 
+                      {formData.enable_bugs && (
+                        <span
                           className="px-3 py-1 text-xs"
-                          style={{ 
+                          style={{
                             backgroundColor: '#333333',
                             color: '#888888',
                           }}
@@ -1194,15 +914,15 @@ export default function WidgetEditPage() {
                     </div>
 
                     {/* NPS Score */}
-                    {config.enable_nps && (
+                    {formData.enable_nps && (
                       <div className="flex gap-1 mb-4">
                         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
                           <button
                             key={score}
                             className="w-6 h-6 text-xs flex items-center justify-center"
                             style={{
-                              backgroundColor: score >= 7 ? `${config.primary_color}30` : '#333333',
-                              color: score >= 7 ? config.primary_color : '#888888',
+                              backgroundColor: score >= 7 ? `${formData.primary_color}30` : '#333333',
+                              color: score >= 7 ? formData.primary_color : '#888888',
                             }}
                           >
                             {score}
@@ -1212,7 +932,7 @@ export default function WidgetEditPage() {
                     )}
 
                     {/* Text Input */}
-                    <div 
+                    <div
                       className="flex-1 p-3 mb-4 text-sm"
                       style={{
                         backgroundColor: '#000000',
@@ -1220,7 +940,7 @@ export default function WidgetEditPage() {
                         color: '#666666',
                       }}
                     >
-                      {config.placeholder_text}
+                      Descreva sua experiência...
                     </div>
 
                     {/* Buttons */}
@@ -1228,11 +948,11 @@ export default function WidgetEditPage() {
                       <button
                         className="flex-1 py-2 text-sm font-medium"
                         style={{
-                          backgroundColor: config.primary_color,
+                          backgroundColor: formData.primary_color,
                           color: '#000000',
                         }}
                       >
-                        {config.submit_button_text}
+                        Enviar
                       </button>
                       <button
                         className="px-4 py-2 text-sm"
@@ -1242,15 +962,15 @@ export default function WidgetEditPage() {
                           color: '#888888',
                         }}
                       >
-                        {config.cancel_button_text}
+                        Cancelar
                       </button>
                     </div>
                   </div>
                 )}
 
                 {/* Inactive Overlay */}
-                {!config.is_active && (
-                  <div 
+                {!formData.is_active && (
+                  <div
                     className="absolute inset-0 flex items-center justify-center"
                     style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
                   >
@@ -1265,11 +985,11 @@ export default function WidgetEditPage() {
               </div>
 
               {/* Quick Info */}
-              <div 
+              <div
                 className="p-4 space-y-3"
-                style={{ 
-                  backgroundColor: '#0a0a0a', 
-                  border: '1px solid #222222' 
+                style={{
+                  backgroundColor: '#0a0a0a',
+                  border: '1px solid #222222'
                 }}
               >
                 <h4 style={{ color: '#ffffff', fontWeight: 500 }}>
@@ -1279,28 +999,22 @@ export default function WidgetEditPage() {
                   <div className="flex justify-between">
                     <span style={{ color: '#888888' }}>Posição:</span>
                     <span style={{ color: '#ffffff' }}>
-                      {POSITIONS.find(p => p.value === config.position)?.label}
+                      {POSITIONS.find(p => p.value === formData.position)?.label}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span style={{ color: '#888888' }}>Gatilho:</span>
                     <span style={{ color: '#ffffff' }}>
-                      {TRIGGERS.find(t => t.value === config.trigger_type)?.label}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span style={{ color: '#888888' }}>Animação:</span>
-                    <span style={{ color: '#ffffff' }}>
-                      {ANIMATIONS.find(a => a.value === config.animation)?.label}
+                      {TRIGGER_TYPES.find(t => t.value === formData.trigger_type)?.label}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span style={{ color: '#888888' }}>Tipos:</span>
                     <span style={{ color: '#ffffff' }}>
                       {[
-                        config.enable_nps && 'NPS',
-                        config.enable_suggestions && 'Sug.',
-                        config.enable_bugs && 'Bug'
+                        formData.enable_nps && 'NPS',
+                        formData.enable_suggestions && 'Sug.',
+                        formData.enable_bugs && 'Bug'
                       ].filter(Boolean).join(', ')}
                     </span>
                   </div>
@@ -1310,36 +1024,6 @@ export default function WidgetEditPage() {
           </div>
         </div>
       </main>
-
-      {/* Keyframe Animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        @keyframes bounceIn {
-          0% { transform: scale(0.3); opacity: 0; }
-          50% { transform: scale(1.05); }
-          70% { transform: scale(0.9); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
-        }
-      `}</style>
     </div>
   );
 }
