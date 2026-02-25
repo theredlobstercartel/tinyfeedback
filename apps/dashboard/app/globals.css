@@ -5,6 +5,23 @@
   --color-white: #ffffff;
   --color-black: #000000;
   
+  /* Theme colors for shadcn/ui */
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f3f4f6;
+  --color-secondary-foreground: #1f2937;
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+  --color-accent: #f3f4f6;
+  --color-accent-foreground: #1f2937;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e5e7eb;
+  --color-input: #e5e7eb;
+  --color-ring: #2563eb;
+  
   /* Gray scale */
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
@@ -20,9 +37,17 @@
   /* Blue */
   --color-blue-50: #eff6ff;
   --color-blue-100: #dbeafe;
+  --color-blue-300: #93c5fd;
   --color-blue-500: #3b82f6;
   --color-blue-600: #2563eb;
   --color-blue-700: #1d4ed8;
+  
+  /* Indigo */
+  --color-indigo-500: #6366f1;
+  --color-indigo-900: #312e81;
+  
+  /* Purple */
+  --color-purple-500: #a855f7;
   
   /* Red */
   --color-red-50: #fef2f2;
