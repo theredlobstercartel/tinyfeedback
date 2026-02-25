@@ -242,3 +242,68 @@ export const WEBHOOK_EVENTS: WebhookEventConfig[] = [
     description: 'Disparado quando o status de um feedback é alterado',
   },
 ];
+
+// Widget Types - ST-06
+export type WidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type WidgetTriggerType = 'button' | 'auto' | 'event';
+
+export interface Widget {
+  id: string;
+  project_id: string;
+  name: string;
+  widget_key: string;
+  primary_color: string;
+  position: WidgetPosition;
+  trigger_type: WidgetTriggerType;
+  enable_nps: boolean;
+  enable_suggestions: boolean;
+  enable_bugs: boolean;
+  title: string;
+  subtitle: string | null;
+  thank_you_message: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateWidgetInput {
+  project_id: string;
+  name: string;
+  primary_color?: string;
+  position?: WidgetPosition;
+  trigger_type?: WidgetTriggerType;
+  enable_nps?: boolean;
+  enable_suggestions?: boolean;
+  enable_bugs?: boolean;
+  title?: string;
+  subtitle?: string;
+  thank_you_message?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateWidgetInput {
+  name?: string;
+  primary_color?: string;
+  position?: WidgetPosition;
+  trigger_type?: WidgetTriggerType;
+  enable_nps?: boolean;
+  enable_suggestions?: boolean;
+  enable_bugs?: boolean;
+  title?: string;
+  subtitle?: string;
+  thank_you_message?: string;
+  is_active?: boolean;
+}
+
+export const WIDGET_POSITIONS: { value: WidgetPosition; label: string }[] = [
+  { value: 'bottom-right', label: 'Inferior Direito' },
+  { value: 'bottom-left', label: 'Inferior Esquerdo' },
+  { value: 'top-right', label: 'Superior Direito' },
+  { value: 'top-left', label: 'Superior Esquerdo' },
+];
+
+export const WIDGET_TRIGGER_TYPES: { value: WidgetTriggerType; label: string }[] = [
+  { value: 'button', label: 'Botão' },
+  { value: 'auto', label: 'Automático' },
+  { value: 'event', label: 'Evento Customizado' },
+];
