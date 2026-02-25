@@ -1,5 +1,4 @@
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 
 export interface SignupCredentials {
   email: string;
@@ -101,27 +100,6 @@ export async function login(credentials: LoginCredentials): Promise<LoginResult>
       success: false,
       error: 'Erro de conexão. Tente novamente.',
     };
-  }
-}
-
-// Server-side: Check if email already exists
-export async function checkEmailExists(email: string): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-    
-    const { data, error } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error checking email:', error);
-    }
-
-    return !!data;
-  } catch {
-    return false;
   }
 }
 
