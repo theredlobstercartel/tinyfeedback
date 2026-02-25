@@ -20,6 +20,7 @@ import {
   WidgetColors,
 } from './themes'
 import { getWidgetBaseStyles, injectStyles } from './styles'
+import { FeedbackFormWidget, FeedbackFormWidgetConfig } from './feedback-form-widget'
 
 // SVG Icons with aria-hidden
 const ICONS = {
@@ -74,6 +75,7 @@ export interface TinyFeedbackWidget {
   open(): void
   close(): void
   updateConfig(config: Partial<WidgetConfig>): void
+  openFormMode?(config?: Partial<FeedbackFormWidgetConfig>): void
 }
 
 class Widget implements TinyFeedbackWidget {
@@ -87,6 +89,9 @@ class Widget implements TinyFeedbackWidget {
   private focusableElements: HTMLElement[] = []
   private announcer: HTMLElement | null = null
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+  // ST-13: Form mode support
+  private formWidget: FeedbackFormWidget | null = null
+  private isFormMode = false
 
   constructor() {
     // Check for data attributes
@@ -862,6 +867,11 @@ class Widget implements TinyFeedbackWidget {
   }
 
   close(): void {
+    if (this.isFormMode && this.formWidget) {
+      this.formWidget.close()
+      return
+    }
+
     if (!this.shadowRoot) return
     
     const overlay = this.shadowRoot.getElementById('tf-modal-overlay')
@@ -878,6 +888,21 @@ class Widget implements TinyFeedbackWidget {
         this.previousFocus?.focus()
       }, 0)
     }
+  }
+
+  // ST-13: Form mode
+  openFormMode(formConfig?: Partial<FeedbackFormWidgetConfig>): void {
+    this.isFormMode = true
+    
+    if (!this.formWidget) {
+      this.formWidget = new FeedbackFormWidget({
+        apiKey: formConfig?.apiKey || this.apiKey,
+        ...formConfig,
+      })
+    }
+    
+    this.formWidget.init()
+    this.formWidget.open()
   }
 
   updateConfig(newConfig: Partial<WidgetConfig>): void {
@@ -901,6 +926,12 @@ class Widget implements TinyFeedbackWidget {
     }
     this.container = null
     this.shadowRoot = null
+    
+    // ST-13: Destroy form widget
+    if (this.formWidget) {
+      this.formWidget.destroy()
+      this.formWidget = null
+    }
   }
 }
 
@@ -931,6 +962,11 @@ export function close(): void {
 
 export function updateConfig(config: Partial<WidgetConfig>): void {
   widgetInstance?.updateConfig(config)
+}
+
+// ST-13: Form mode API
+export function openFormMode(config?: Partial<FeedbackFormWidgetConfig>): void {
+  widgetInstance?.openFormMode?.(config)
 }
 
 // Auto-init if data attributes are present
