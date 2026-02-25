@@ -153,3 +153,92 @@ export interface DailySummary {
   new_bugs_count: number;
   highlights: SummaryHighlight[];
 }
+
+// Webhook Types - ST-11
+export type WebhookEvent = 'feedback.created' | 'feedback.updated';
+
+export interface Webhook {
+  id: string;
+  project_id: string;
+  name: string;
+  url: string;
+  events: WebhookEvent[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookWithSecret extends Webhook {
+  secret: string;
+}
+
+export interface CreateWebhookInput {
+  project_id: string;
+  name: string;
+  url: string;
+  events: WebhookEvent[];
+}
+
+export interface UpdateWebhookInput {
+  name?: string;
+  url?: string;
+  events?: WebhookEvent[];
+  is_active?: boolean;
+}
+
+export type WebhookDeliveryStatus = 'pending' | 'delivered' | 'failed';
+
+export interface WebhookDeliveryLog {
+  id: string;
+  webhook_id: string;
+  event_type: WebhookEvent;
+  status: WebhookDeliveryStatus;
+  http_status_code: number | null;
+  response_body: string | null;
+  error_message: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface WebhookDeliveryLogWithPayload extends WebhookDeliveryLog {
+  payload: {
+    event: WebhookEvent;
+    timestamp: string;
+    data: Record<string, unknown>;
+  };
+  signature: string;
+}
+
+export interface WebhookTestResult {
+  success: boolean;
+  status_code?: number;
+  response_time_ms: number;
+  response_body?: string;
+  error?: string;
+  test_payload: {
+    event: WebhookEvent;
+    timestamp: string;
+    data: Record<string, unknown>;
+  };
+}
+
+export interface WebhookEventConfig {
+  event: WebhookEvent;
+  label: string;
+  description: string;
+}
+
+export const WEBHOOK_EVENTS: WebhookEventConfig[] = [
+  {
+    event: 'feedback.created',
+    label: 'Novo Feedback',
+    description: 'Disparado quando um novo feedback é recebido',
+  },
+  {
+    event: 'feedback.updated',
+    label: 'Feedback Atualizado',
+    description: 'Disparado quando o status de um feedback é alterado',
+  },
+];
