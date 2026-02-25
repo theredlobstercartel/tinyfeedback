@@ -15,7 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import type { Project } from '@/types';
-import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution, NpsOverTimeChart } from '@/components/analytics';
+import { StatCard, NpsGauge, TrendChart, VolumeChart, TypeDistribution, NpsOverTimeChart, ResponseRate } from '@/components/analytics';
 
 interface NpsOverTimeDataPoint {
   date: string;
@@ -50,6 +50,11 @@ interface AnalyticsData {
     date: string;
     count: number;
   }[];
+  responseRate: {
+    total: number;
+    responded: number;
+    rate: number;
+  };
 }
 
 export default function AnalyticsPage() {
@@ -305,12 +310,15 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Secondary Stats & Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* NPS Gauge */}
               <NpsGauge score={analytics.averageNps} />
 
               {/* Type Distribution */}
               <TypeDistribution distribution={analytics.typeDistribution} />
+
+              {/* Response Rate - ST-09 */}
+              <ResponseRate responseRate={analytics.responseRate} />
             </div>
 
             {/* Trend Chart */}

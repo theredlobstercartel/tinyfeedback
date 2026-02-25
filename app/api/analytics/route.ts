@@ -36,6 +36,12 @@ export interface AnalyticsData {
     detractors: number;
     totalResponses: number;
   }[];
+  // ST-09: Response Rate metric
+  responseRate: {
+    total: number;
+    responded: number;
+    rate: number;
+  };
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -319,8 +325,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    // Query 9: Response Rate - ST-09
+    const { count: respondedCount, error: respondedError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .eq('response_sent', true);
+
+    if (respondedError) {
+      console.error('Error fetching responded feedbacks:', respondedError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics data' },
+        { status: 500 }
+      );
+    }
+
+    const total = totalFeedbacks || 0;
+    const responded = respondedCount || 0;
+    const rate = total > 0 ? Math.round((responded / total) * 100) : 0;
+
     const analyticsData: AnalyticsData = {
-      totalFeedbacks: totalFeedbacks || 0,
+      totalFeedbacks: total,
       averageNps,
       feedbacksToday: feedbacksToday || 0,
       feedbacksThisWeek: feedbacksThisWeek || 0,
@@ -334,6 +359,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       recentTrend,
       volumeData,
       npsOverTime,
+      responseRate: {
+        total,
+        responded,
+        rate,
+      },
     };
 
     return NextResponse.json(analyticsData);
